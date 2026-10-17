@@ -1,0 +1,29 @@
+buffer,buffer_depth_ms,burst_ratio,configured_jitter_ms,configured_loss_pct,effective_loss_pct,experiment,late_pct,loss_mode,measured_loss_pct,mos,packets_lost,packets_sent,playout_delay_ms,quality
+,,1.0,,2,,burst,,random,1.29,3.58,19,1470,,POOR
+,,3.23,,2,,burst,,burst,2.24,2.52,33,1471,,BAD
+,,1.0,,4,,burst,,random,4.36,2.25,64,1467,,BAD
+,,6.15,,4,,burst,,burst,3.47,1.37,51,1470,,BAD
+,,1.0,,6,,burst,,random,6.74,1.76,99,1469,,BAD
+,,3.38,,6,,burst,,burst,4.83,1.06,71,1471,,BAD
+,,1.01,,8,,burst,,random,7.43,1.66,109,1467,,BAD
+,,4.24,,8,,burst,,burst,7.16,1.0,105,1466,,BAD
+,,1.0,,10,,burst,,random,10.18,1.41,149,1463,,BAD
+,,3.21,,10,,burst,,burst,6.81,1.0,100,1469,,BAD
+,,1.0,,15,,burst,,random,14.38,1.21,211,1467,,BAD
+,,4.39,,15,,burst,,burst,19.26,1.0,283,1469,,BAD
+off,0.0,,30.0,,0.0,buffer,0.0,,,4.36,,,47.6,EXCELLENT
+20 ms,20.0,,30.0,,71.5,buffer,71.5,,,1.0,,,40.2,BAD
+40 ms,40.0,,30.0,,24.43,buffer,24.43,,,1.05,,,60.3,BAD
+60 ms,60.0,,30.0,,1.52,buffer,1.52,,,3.41,,,80.3,POOR
+80 ms,80.0,,30.0,,0.0,buffer,0.0,,,4.35,,,100.2,EXCELLENT
+100 ms,100.0,,30.0,,0.0,buffer,0.0,,,4.34,,,120.3,EXCELLENT
+150 ms,150.0,,30.0,,0.0,buffer,0.0,,,4.3,,,170.2,EXCELLENT
+adaptive,69.0,,30.0,,0.26,buffer,0.26,,,4.21,,,89.3,GOOD
+off,0.0,,60.0,,0.0,buffer,0.0,,,4.34,,,52.0,EXCELLENT
+20 ms,20.0,,60.0,,84.18,buffer,84.18,,,1.0,,,20.2,BAD
+40 ms,40.0,,60.0,,63.1,buffer,63.1,,,1.0,,,40.1,BAD
+60 ms,60.0,,60.0,,37.91,buffer,37.91,,,1.0,,,60.1,BAD
+80 ms,80.0,,60.0,,20.26,buffer,20.26,,,1.08,,,80.2,BAD
+100 ms,100.0,,60.0,,6.72,buffer,6.72,,,1.72,,,100.1,BAD
+150 ms,150.0,,60.0,,0.0,buffer,0.0,,,4.32,,,150.1,EXCELLENT
+adaptive,135.8,,60.0,,2.81,buffer,2.81,,,2.69,,,136.0,BAD

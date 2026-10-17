@@ -32,7 +32,11 @@ const Dashboard = () => {
   const [config, setConfig] = useState({
     delay_ms: 20,
     jitter_ms: 2,
-    packet_loss_pct: 0
+    packet_loss_pct: 0,
+    loss_mode: 'random',
+    burst_length: 5,
+    buffer_mode: 'off',
+    buffer_ms: 40
   });
 
   const [history, setHistory] = useState([]);
@@ -192,7 +196,11 @@ const Dashboard = () => {
           title="JITTER (RFC 3550)"
           value={metrics.jitter ? metrics.jitter.toFixed(1) : '0.0'}
           unit="ms"
-          subValue="Standard RFC 3550 Interarrival Deviation"
+          subValue={
+            metrics.buffer_mode && metrics.buffer_mode !== 'off'
+              ? `Buffer: ${metrics.buffer_mode} ${Number(metrics.buffer_ms).toFixed(0)} ms | Late packets: ${Number(metrics.late_pct).toFixed(1)}%`
+              : 'Standard RFC 3550 Interarrival Deviation'
+          }
           color="var(--accent-purple)"
           icon={Waves}
         />
@@ -201,7 +209,7 @@ const Dashboard = () => {
           title="PACKET LOSS"
           value={metrics.packet_loss ? metrics.packet_loss.toFixed(1) : '0.0'}
           unit="%"
-          subValue={`${metrics.packets_lost} lost / ${metrics.packets_sent} sent`}
+          subValue={`${metrics.packets_lost} lost / ${metrics.packets_sent} sent${metrics.burst_ratio > 1.2 ? ' | burst ratio ' + Number(metrics.burst_ratio).toFixed(1) : ''}`}
           color={metrics.packet_loss > 5 ? 'var(--accent-red)' : 'var(--accent-emerald)'}
           icon={ShieldAlert}
         />
@@ -210,7 +218,7 @@ const Dashboard = () => {
           title="ESTIMATED MOS"
           value={metrics.mos ? metrics.mos.toFixed(2) : '1.00'}
           unit="/ 5.0"
-          subValue={`Rating: ${metrics.quality} (ITU-T G.107 E-model)`}
+          subValue={`Rating: ${metrics.quality} (ITU-T G.107 E-model)${metrics.buffer_mode && metrics.buffer_mode !== 'off' ? ' | Effective loss ' + Number(metrics.effective_loss).toFixed(1) + '% | Playout delay ' + Number(metrics.playout_delay).toFixed(0) + ' ms' : ''}`}
           color="var(--accent-emerald)"
           icon={Award}
         />

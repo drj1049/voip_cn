@@ -41,6 +41,10 @@ class ImpairmentConfigRequest(BaseModel):
     delay_ms: Optional[float] = Field(None, ge=0.0, le=500.0, description="Base delay in ms (0-500)")
     jitter_ms: Optional[float] = Field(None, ge=0.0, le=100.0, description="Jitter variation in ms (0-100)")
     packet_loss_pct: Optional[float] = Field(None, ge=0.0, le=30.0, description="Packet loss percentage (0-30)")
+    loss_mode: Optional[str] = Field(None, description="Loss pattern: random or burst")
+    burst_length: Optional[float] = Field(None, ge=1.0, le=20.0, description="Average burst length in packets (1-20)")
+    buffer_mode: Optional[str] = Field(None, description="Jitter buffer: off, fixed or adaptive")
+    buffer_ms: Optional[float] = Field(None, ge=0.0, le=300.0, description="Fixed jitter buffer depth in ms (0-300)")
 
 @app.on_event("startup")
 def startup_event():
@@ -103,7 +107,15 @@ def get_config():
 @app.post("/config")
 def update_config(req: ImpairmentConfigRequest):
     """Updates network impairment settings dynamically."""
-    simulator.update_config(req.delay_ms, req.jitter_ms, req.packet_loss_pct)
+    simulator.update_config(
+        delay_ms=req.delay_ms,
+        jitter_ms=req.jitter_ms,
+        packet_loss_pct=req.packet_loss_pct,
+        loss_mode=req.loss_mode,
+        burst_length=req.burst_length,
+        buffer_mode=req.buffer_mode,
+        buffer_ms=req.buffer_ms,
+    )
     return {
         "message": "Config updated successfully",
         "current_config": simulator.get_config()

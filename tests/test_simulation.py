@@ -23,3 +23,17 @@ def test_simulator_lifecycle():
 
     stopped = sim.get_current_metrics()
     assert stopped["status"] == "STOPPED"
+
+
+def test_simulator_applies_burst_and_buffer_settings():
+    sim = VoIPSimulator(target_port=5098)
+    sim.update_config(packet_loss_pct=5.0, loss_mode="burst", burst_length=6.0,
+                      buffer_mode="fixed", buffer_ms=60.0)
+    cfg = sim.get_config()
+    assert cfg["loss_mode"] == "burst"
+    assert cfg["burst_length"] == 6.0
+    assert cfg["buffer_mode"] == "fixed"
+    assert cfg["buffer_ms"] == 60.0
+    metrics = sim.get_current_metrics()
+    assert metrics["buffer_mode"] == "fixed"
+    assert "burst_ratio" in metrics and "late_pct" in metrics

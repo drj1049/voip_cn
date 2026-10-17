@@ -1,0 +1,314 @@
+{
+  "burst_vs_random": [
+    {
+      "experiment": "burst",
+      "loss_mode": "random",
+      "configured_loss_pct": 2,
+      "measured_loss_pct": 1.29,
+      "burst_ratio": 1.0,
+      "mos": 3.58,
+      "quality": "POOR",
+      "packets_sent": 1470,
+      "packets_lost": 19
+    },
+    {
+      "experiment": "burst",
+      "loss_mode": "burst",
+      "configured_loss_pct": 2,
+      "measured_loss_pct": 2.24,
+      "burst_ratio": 3.23,
+      "mos": 2.52,
+      "quality": "BAD",
+      "packets_sent": 1471,
+      "packets_lost": 33
+    },
+    {
+      "experiment": "burst",
+      "loss_mode": "random",
+      "configured_loss_pct": 4,
+      "measured_loss_pct": 4.36,
+      "burst_ratio": 1.0,
+      "mos": 2.25,
+      "quality": "BAD",
+      "packets_sent": 1467,
+      "packets_lost": 64
+    },
+    {
+      "experiment": "burst",
+      "loss_mode": "burst",
+      "configured_loss_pct": 4,
+      "measured_loss_pct": 3.47,
+      "burst_ratio": 6.15,
+      "mos": 1.37,
+      "quality": "BAD",
+      "packets_sent": 1470,
+      "packets_lost": 51
+    },
+    {
+      "experiment": "burst",
+      "loss_mode": "random",
+      "configured_loss_pct": 6,
+      "measured_loss_pct": 6.74,
+      "burst_ratio": 1.0,
+      "mos": 1.76,
+      "quality": "BAD",
+      "packets_sent": 1469,
+      "packets_lost": 99
+    },
+    {
+      "experiment": "burst",
+      "loss_mode": "burst",
+      "configured_loss_pct": 6,
+      "measured_loss_pct": 4.83,
+      "burst_ratio": 3.38,
+      "mos": 1.06,
+      "quality": "BAD",
+      "packets_sent": 1471,
+      "packets_lost": 71
+    },
+    {
+      "experiment": "burst",
+      "loss_mode": "random",
+      "configured_loss_pct": 8,
+      "measured_loss_pct": 7.43,
+      "burst_ratio": 1.01,
+      "mos": 1.66,
+      "quality": "BAD",
+      "packets_sent": 1467,
+      "packets_lost": 109
+    },
+    {
+      "experiment": "burst",
+      "loss_mode": "burst",
+      "configured_loss_pct": 8,
+      "measured_loss_pct": 7.16,
+      "burst_ratio": 4.24,
+      "mos": 1.0,
+      "quality": "BAD",
+      "packets_sent": 1466,
+      "packets_lost": 105
+    },
+    {
+      "experiment": "burst",
+      "loss_mode": "random",
+      "configured_loss_pct": 10,
+      "measured_loss_pct": 10.18,
+      "burst_ratio": 1.0,
+      "mos": 1.41,
+      "quality": "BAD",
+      "packets_sent": 1463,
+      "packets_lost": 149
+    },
+    {
+      "experiment": "burst",
+      "loss_mode": "burst",
+      "configured_loss_pct": 10,
+      "measured_loss_pct": 6.81,
+      "burst_ratio": 3.21,
+      "mos": 1.0,
+      "quality": "BAD",
+      "packets_sent": 1469,
+      "packets_lost": 100
+    },
+    {
+      "experiment": "burst",
+      "loss_mode": "random",
+      "configured_loss_pct": 15,
+      "measured_loss_pct": 14.38,
+      "burst_ratio": 1.0,
+      "mos": 1.21,
+      "quality": "BAD",
+      "packets_sent": 1467,
+      "packets_lost": 211
+    },
+    {
+      "experiment": "burst",
+      "loss_mode": "burst",
+      "configured_loss_pct": 15,
+      "measured_loss_pct": 19.26,
+      "burst_ratio": 4.39,
+      "mos": 1.0,
+      "quality": "BAD",
+      "packets_sent": 1469,
+      "packets_lost": 283
+    }
+  ],
+  "jitter_buffer": [
+    {
+      "experiment": "buffer",
+      "configured_jitter_ms": 30.0,
+      "buffer": "off",
+      "buffer_depth_ms": 0.0,
+      "late_pct": 0.0,
+      "playout_delay_ms": 47.6,
+      "effective_loss_pct": 0.0,
+      "mos": 4.36,
+      "quality": "EXCELLENT"
+    },
+    {
+      "experiment": "buffer",
+      "configured_jitter_ms": 30.0,
+      "buffer": "20 ms",
+      "buffer_depth_ms": 20.0,
+      "late_pct": 71.5,
+      "playout_delay_ms": 40.2,
+      "effective_loss_pct": 71.5,
+      "mos": 1.0,
+      "quality": "BAD"
+    },
+    {
+      "experiment": "buffer",
+      "configured_jitter_ms": 30.0,
+      "buffer": "40 ms",
+      "buffer_depth_ms": 40.0,
+      "late_pct": 24.43,
+      "playout_delay_ms": 60.3,
+      "effective_loss_pct": 24.43,
+      "mos": 1.05,
+      "quality": "BAD"
+    },
+    {
+      "experiment": "buffer",
+      "configured_jitter_ms": 30.0,
+      "buffer": "60 ms",
+      "buffer_depth_ms": 60.0,
+      "late_pct": 1.52,
+      "playout_delay_ms": 80.3,
+      "effective_loss_pct": 1.52,
+      "mos": 3.41,
+      "quality": "POOR"
+    },
+    {
+      "experiment": "buffer",
+      "configured_jitter_ms": 30.0,
+      "buffer": "80 ms",
+      "buffer_depth_ms": 80.0,
+      "late_pct": 0.0,
+      "playout_delay_ms": 100.2,
+      "effective_loss_pct": 0.0,
+      "mos": 4.35,
+      "quality": "EXCELLENT"
+    },
+    {
+      "experiment": "buffer",
+      "configured_jitter_ms": 30.0,
+      "buffer": "100 ms",
+      "buffer_depth_ms": 100.0,
+      "late_pct": 0.0,
+      "playout_delay_ms": 120.3,
+      "effective_loss_pct": 0.0,
+      "mos": 4.34,
+      "quality": "EXCELLENT"
+    },
+    {
+      "experiment": "buffer",
+      "configured_jitter_ms": 30.0,
+      "buffer": "150 ms",
+      "buffer_depth_ms": 150.0,
+      "late_pct": 0.0,
+      "playout_delay_ms": 170.2,
+      "effective_loss_pct": 0.0,
+      "mos": 4.3,
+      "quality": "EXCELLENT"
+    },
+    {
+      "experiment": "buffer",
+      "configured_jitter_ms": 30.0,
+      "buffer": "adaptive",
+      "buffer_depth_ms": 69.0,
+      "late_pct": 0.26,
+      "playout_delay_ms": 89.3,
+      "effective_loss_pct": 0.26,
+      "mos": 4.21,
+      "quality": "GOOD"
+    },
+    {
+      "experiment": "buffer",
+      "configured_jitter_ms": 60.0,
+      "buffer": "off",
+      "buffer_depth_ms": 0.0,
+      "late_pct": 0.0,
+      "playout_delay_ms": 52.0,
+      "effective_loss_pct": 0.0,
+      "mos": 4.34,
+      "quality": "EXCELLENT"
+    },
+    {
+      "experiment": "buffer",
+      "configured_jitter_ms": 60.0,
+      "buffer": "20 ms",
+      "buffer_depth_ms": 20.0,
+      "late_pct": 84.18,
+      "playout_delay_ms": 20.2,
+      "effective_loss_pct": 84.18,
+      "mos": 1.0,
+      "quality": "BAD"
+    },
+    {
+      "experiment": "buffer",
+      "configured_jitter_ms": 60.0,
+      "buffer": "40 ms",
+      "buffer_depth_ms": 40.0,
+      "late_pct": 63.1,
+      "playout_delay_ms": 40.1,
+      "effective_loss_pct": 63.1,
+      "mos": 1.0,
+      "quality": "BAD"
+    },
+    {
+      "experiment": "buffer",
+      "configured_jitter_ms": 60.0,
+      "buffer": "60 ms",
+      "buffer_depth_ms": 60.0,
+      "late_pct": 37.91,
+      "playout_delay_ms": 60.1,
+      "effective_loss_pct": 37.91,
+      "mos": 1.0,
+      "quality": "BAD"
+    },
+    {
+      "experiment": "buffer",
+      "configured_jitter_ms": 60.0,
+      "buffer": "80 ms",
+      "buffer_depth_ms": 80.0,
+      "late_pct": 20.26,
+      "playout_delay_ms": 80.2,
+      "effective_loss_pct": 20.26,
+      "mos": 1.08,
+      "quality": "BAD"
+    },
+    {
+      "experiment": "buffer",
+      "configured_jitter_ms": 60.0,
+      "buffer": "100 ms",
+      "buffer_depth_ms": 100.0,
+      "late_pct": 6.72,
+      "playout_delay_ms": 100.1,
+      "effective_loss_pct": 6.72,
+      "mos": 1.72,
+      "quality": "BAD"
+    },
+    {
+      "experiment": "buffer",
+      "configured_jitter_ms": 60.0,
+      "buffer": "150 ms",
+      "buffer_depth_ms": 150.0,
+      "late_pct": 0.0,
+      "playout_delay_ms": 150.1,
+      "effective_loss_pct": 0.0,
+      "mos": 4.32,
+      "quality": "EXCELLENT"
+    },
+    {
+      "experiment": "buffer",
+      "configured_jitter_ms": 60.0,
+      "buffer": "adaptive",
+      "buffer_depth_ms": 135.8,
+      "late_pct": 2.81,
+      "playout_delay_ms": 136.0,
+      "effective_loss_pct": 2.81,
+      "mos": 2.69,
+      "quality": "BAD"
+    }
+  ]
+}

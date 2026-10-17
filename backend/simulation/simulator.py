@@ -15,6 +15,7 @@ from backend.simulation.udp_receiver import UDPReceiver
 from backend.metrics.latency import LatencyCalculator
 from backend.metrics.packet_loss import PacketLossCalculator
 from backend.metrics.jitter import RFC3550JitterCalculator
+from backend.metrics.jitter_buffer import JitterBuffer
 from backend.metrics.mos import MOSEstimator
 
 class VoIPSimulator:
@@ -41,6 +42,7 @@ class VoIPSimulator:
         self.latency_calc = LatencyCalculator()
         self.packet_loss_calc = PacketLossCalculator()
         self.jitter_calc = RFC3550JitterCalculator()
+        self.jitter_buffer = JitterBuffer()
 
         # Threading state control
         self.is_running: bool = False
@@ -48,10 +50,13 @@ class VoIPSimulator:
         self._receiver_thread: Optional[threading.Thread] = None
         self._lock = threading.Lock()
 
-    def update_config(self, delay_ms: Optional[float] = None, jitter_ms: Optional[float] = None, packet_loss_pct: Optional[float] = None):
-        """Updates impairment engine parameters in real time."""
+    def update_config(self, delay_ms: Optional[float] = None, jitter_ms: Optional[float] = None, packet_loss_pct: Optional[float] = None,
+                      loss_mode: Optional[str] = None, burst_length: Optional[float] = None,
+                      buffer_mode: Optional[str] = None, buffer_ms: Optional[float] = None):
+        """Updates impairment engine and jitter buffer parameters in real time."""
         with self._lock:
-            self.impairment.update_config(delay_ms, jitter_ms, packet_loss_pct)
+            self.impairment.update_config(delay_ms, jitter_ms, packet_loss_pct, loss_mode, burst_length)
+            self.jitter_buffer.configure(buffer_mode, buffer_ms)
 
     def get_config(self) -> Dict[str, float]:
         """Returns current impairment settings."""
@@ -59,7 +64,11 @@ class VoIPSimulator:
             return {
                 "delay_ms": self.impairment.delay_ms,
                 "jitter_ms": self.impairment.jitter_ms,
-                "packet_loss_pct": self.impairment.packet_loss_pct
+                "packet_loss_pct": self.impairment.packet_loss_pct,
+                "loss_mode": self.impairment.loss_mode,
+                "burst_length": self.impairment.burst_length,
+                "buffer_mode": self.jitter_buffer.mode,
+                "buffer_ms": self.jitter_buffer.fixed_ms
             }
 
     def start(self) -> bool:
@@ -123,6 +132,8 @@ class VoIPSimulator:
             self.latency_calc.reset()
             self.packet_loss_calc.reset()
             self.jitter_calc.reset()
+            self.jitter_buffer.reset()
+            self.impairment.reset_state()
 
         if was_running:
             self.start()
@@ -181,7 +192,8 @@ class VoIPSimulator:
                     # Update metrics engines
                     self.latency_calc.add_packet(packet)
                     self.packet_loss_calc.add_received_packet(packet)
-                    self.jitter_calc.add_packet(packet)
+                    jitter_now = self.jitter_calc.add_packet(packet)
+                    self.jitter_buffer.process(packet, jitter_now)
 
     def get_current_metrics(self) -> Dict[str, Any]:
         """Returns compiled snapshot of metrics for frontend WebSocket/REST API."""
@@ -192,13 +204,27 @@ class VoIPSimulator:
             final = (not self.is_running) or (not getattr(self, '_sender_active', True))
             loss_data = self.packet_loss_calc.get_metrics(final)
             jitter_data = self.jitter_calc.get_metrics()
+            burst_ratio = self.packet_loss_calc.get_burst_ratio(final)
 
-            # MOS Estimation using current metrics
             avg_latency = latency_data["avg_ms"]
             jitter_ms = jitter_data["jitter_ms"]
             loss_pct = loss_data["loss_percentage"]
 
-            mos_data = MOSEstimator.get_metrics(avg_latency, jitter_ms, loss_pct)
+            buf = self.jitter_buffer
+            if buf.mode == "off":
+                # No buffer: use measured latency, jitter and network loss directly
+                late_pct = 0.0
+                effective_loss = loss_pct
+                playout_delay = avg_latency
+                mos_data = MOSEstimator.get_metrics(avg_latency, jitter_ms, loss_pct, burst_ratio)
+            else:
+                # Buffer on: late packets are discarded (counted as loss) and the
+                # listener hears a steady playout delay, so jitter itself is no
+                # longer added to the delay.
+                late_pct = buf.late_pct(final)
+                effective_loss = 100.0 * (1.0 - (1.0 - loss_pct / 100.0) * (1.0 - late_pct / 100.0))
+                playout_delay = buf.playout_delay_ms()
+                mos_data = MOSEstimator.get_metrics(playout_delay, 0.0, effective_loss, burst_ratio)
 
             return {
                 "timestamp": time.time(),
@@ -212,6 +238,12 @@ class VoIPSimulator:
                 "packets_sent": loss_data["packets_sent"],
                 "packets_received": loss_data["packets_received"],
                 "packets_lost": loss_data["packets_lost"],
+                "burst_ratio": round(burst_ratio, 2),
+                "buffer_mode": buf.mode,
+                "buffer_ms": round(buf.current_ms, 1),
+                "late_pct": round(late_pct, 2),
+                "effective_loss": round(effective_loss, 2),
+                "playout_delay": round(playout_delay, 1),
                 "mos": mos_data["mos"],
                 "r_factor": mos_data["r_factor"],
                 "quality": mos_data["quality"]

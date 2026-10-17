@@ -10,7 +10,7 @@ class MOSEstimator:
     """
 
     @staticmethod
-    def calculate_r_factor(latency_ms: float, jitter_ms: float, packet_loss_pct: float) -> float:
+    def calculate_r_factor(latency_ms: float, jitter_ms: float, packet_loss_pct: float, burst_ratio: float = 1.0) -> float:
         """
         Calculates Transmission Rating Factor R (0 - 100).
         Formula: R = R0 - Id - Ie_eff
@@ -32,19 +32,22 @@ class MOSEstimator:
         Bpl = 4.3
         P_loss = max(0.0, float(packet_loss_pct))
 
-        Ie_eff = Ie + (95.0 - Ie) * (P_loss / (P_loss + Bpl))
+        # BurstR (G.107) is 1 for random loss and above 1 when losses come in
+        # bursts, which lowers the quality score for the same average loss.
+        burst_r = max(1.0, float(burst_ratio))
+        Ie_eff = Ie + (95.0 - Ie) * (P_loss / (P_loss / burst_r + Bpl))
 
         # 3. Overall R-Factor
         R = R0 - Id - Ie_eff
         return max(0.0, min(100.0, R))
 
     @classmethod
-    def calculate_mos(cls, latency_ms: float, jitter_ms: float, packet_loss_pct: float) -> float:
+    def calculate_mos(cls, latency_ms: float, jitter_ms: float, packet_loss_pct: float, burst_ratio: float = 1.0) -> float:
         """
         Converts R-factor into Estimated MOS (1.0 to 4.5/5.0).
         Standard ITU-T G.107 conversion polynomial.
         """
-        R = cls.calculate_r_factor(latency_ms, jitter_ms, packet_loss_pct)
+        R = cls.calculate_r_factor(latency_ms, jitter_ms, packet_loss_pct, burst_ratio)
 
         if R <= 0:
             mos = 1.0
@@ -72,10 +75,10 @@ class MOSEstimator:
             return "BAD"
 
     @classmethod
-    def get_metrics(cls, latency_ms: float, jitter_ms: float, packet_loss_pct: float) -> Dict[str, Any]:
+    def get_metrics(cls, latency_ms: float, jitter_ms: float, packet_loss_pct: float, burst_ratio: float = 1.0) -> Dict[str, Any]:
         """Returns snapshot dictionary of MOS estimation."""
-        r_factor = cls.calculate_r_factor(latency_ms, jitter_ms, packet_loss_pct)
-        mos = cls.calculate_mos(latency_ms, jitter_ms, packet_loss_pct)
+        r_factor = cls.calculate_r_factor(latency_ms, jitter_ms, packet_loss_pct, burst_ratio)
+        mos = cls.calculate_mos(latency_ms, jitter_ms, packet_loss_pct, burst_ratio)
         quality = cls.classify_quality(mos)
 
         return {

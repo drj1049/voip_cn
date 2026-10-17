@@ -16,8 +16,20 @@ const ControlPanel = ({
     });
   };
 
+  const setField = (field, value) => {
+    onConfigChange({ ...config, [field]: value });
+  };
+
+  const toggleStyle = (active) =>
+    active
+      ? { borderColor: 'var(--accent-blue)', color: 'var(--accent-blue)' }
+      : {};
+
+  // Presets only change delay, jitter and loss; the loss pattern and
+  // jitter buffer settings stay as the user left them.
   const applyPreset = (delay, jitter, loss) => {
     onConfigChange({
+      ...config,
       delay_ms: delay,
       jitter_ms: jitter,
       packet_loss_pct: loss
@@ -80,6 +92,103 @@ const ControlPanel = ({
             className="custom-slider"
           />
         </div>
+
+        {/* Loss pattern: random or bursty */}
+        <div className="slider-item">
+          <label>
+            <span>Loss Pattern</span>
+            <span className="val">{config.loss_mode === 'burst' ? 'Bursty' : 'Random'}</span>
+          </label>
+          <div className="preset-buttons-grid">
+            <button
+              className="preset-btn"
+              style={toggleStyle(config.loss_mode !== 'burst')}
+              onClick={() => setField('loss_mode', 'random')}
+            >
+              Random drops
+            </button>
+            <button
+              className="preset-btn"
+              style={toggleStyle(config.loss_mode === 'burst')}
+              onClick={() => setField('loss_mode', 'burst')}
+            >
+              Bursty drops
+            </button>
+          </div>
+        </div>
+
+        {config.loss_mode === 'burst' && (
+          <div className="slider-item">
+            <label>
+              <span>Average Burst Length</span>
+              <span className="val">{config.burst_length} packets</span>
+            </label>
+            <input
+              type="range"
+              min="1"
+              max="20"
+              step="1"
+              value={config.burst_length}
+              onChange={(e) => handleSliderChange('burst_length', e.target.value)}
+              className="custom-slider"
+            />
+          </div>
+        )}
+
+        {/* Receiver jitter buffer */}
+        <div className="slider-item">
+          <label>
+            <span>Jitter Buffer</span>
+            <span className="val">
+              {config.buffer_mode === 'fixed'
+                ? `Fixed ${config.buffer_ms} ms`
+                : config.buffer_mode === 'adaptive'
+                ? 'Adaptive'
+                : 'Off'}
+            </span>
+          </label>
+          <div className="preset-buttons-grid">
+            <button
+              className="preset-btn"
+              style={toggleStyle(config.buffer_mode === 'off' || !config.buffer_mode)}
+              onClick={() => setField('buffer_mode', 'off')}
+            >
+              Off
+            </button>
+            <button
+              className="preset-btn"
+              style={toggleStyle(config.buffer_mode === 'fixed')}
+              onClick={() => setField('buffer_mode', 'fixed')}
+            >
+              Fixed
+            </button>
+            <button
+              className="preset-btn"
+              style={toggleStyle(config.buffer_mode === 'adaptive')}
+              onClick={() => setField('buffer_mode', 'adaptive')}
+            >
+              Adaptive
+            </button>
+          </div>
+        </div>
+
+        {config.buffer_mode === 'fixed' && (
+          <div className="slider-item">
+            <label>
+              <span>Buffer Depth</span>
+              <span className="val">{config.buffer_ms} ms</span>
+            </label>
+            <input
+              type="range"
+              min="0"
+              max="200"
+              step="5"
+              value={config.buffer_ms}
+              onChange={(e) => handleSliderChange('buffer_ms', e.target.value)}
+              className="custom-slider"
+            />
+          </div>
+        )}
       </div>
 
       {/* Simulation Control Buttons */}

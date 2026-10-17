@@ -22,6 +22,7 @@ class PacketLossCalculator:
         self.packets_received: int = 0
         self.sequence_gap_lost: int = 0
         self.max_seq_received: int = -1
+        self._gap_events: int = 0   # number of separate runs of lost packets
 
     def record_sent(self):
         """Called whenever a packet is dispatched by the generator."""
@@ -48,6 +49,7 @@ class PacketLossCalculator:
             gap = diff - 1
             if gap > 0:
                 self.sequence_gap_lost += gap
+                self._gap_events += 1
                 for _ in range(min(gap, self.window_size)):
                     self._window.append(False)
             self._window.append(True)
@@ -100,6 +102,38 @@ class PacketLossCalculator:
         loss_pct = (lost / total_expected) * 100.0
         return min(100.0, max(0.0, loss_pct))
 
+    def get_burst_ratio(self, final: bool = False) -> float:
+        """
+        Burst ratio (BurstR in ITU-T G.107): average observed burst length
+        divided by the average burst length expected if losses were random.
+        1.0 means random loss, larger means losses arrive in clumps.
+        Live view uses the recent window, final view uses the whole run.
+        """
+        if final:
+            lost = self.sequence_gap_lost
+            runs = self._gap_events
+            total = self.packets_received + lost
+        else:
+            runs = 0
+            lost = 0
+            previous_lost = False
+            for arrived in self._window:
+                if not arrived:
+                    lost += 1
+                    if not previous_lost:
+                        runs += 1
+                previous_lost = not arrived
+            total = len(self._window)
+
+        if lost == 0 or runs == 0 or total == 0:
+            return 1.0
+        p = lost / total
+        if p >= 1.0:
+            return 1.0
+        observed_burst = lost / runs
+        expected_random_burst = 1.0 / (1.0 - p)
+        return max(1.0, min(10.0, observed_burst / expected_random_burst))
+
     def get_metrics(self, final: bool = False) -> Dict[str, Any]:
         """Returns snapshot of packet loss statistics."""
         lost = self.get_packets_lost(final)
@@ -116,4 +150,5 @@ class PacketLossCalculator:
         self.packets_received = 0
         self.sequence_gap_lost = 0
         self.max_seq_received = -1
+        self._gap_events = 0
         self._window.clear()
