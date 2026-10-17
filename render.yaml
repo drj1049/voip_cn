@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: voip-quality-analyzer
+    runtime: docker
+    plan: free
+    healthCheckPath: /status
+    autoDeploy: true

@@ -47,6 +47,10 @@ Open http://127.0.0.1:8000. The backend serves the built dashboard, so one windo
 
 For frontend development, run `npm run dev` inside `frontend/` and open http://localhost:3000. It talks to the backend on port 8000.
 
+## Deploy on Render
+
+The repo includes a `Dockerfile` and `render.yaml`. On render.com, choose New > Blueprint, connect the GitHub repo `drj1049/voip_cn`, and deploy. Render builds the dashboard and starts the backend on its own port. The free plan sleeps after about 15 minutes idle, so the first load can take up to a minute. All visitors share one simulation.
+
 ## Tests and experiments
 
 ```bash
