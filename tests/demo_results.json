@@ -1,0 +1,72 @@
+[
+  {
+    "scenario": "Good Network",
+    "configured_delay_ms": 20.0,
+    "measured_latency_ms": 20.56,
+    "configured_jitter_ms": 2.0,
+    "measured_jitter_ms": 1.01,
+    "configured_loss_pct": 0.0,
+    "measured_loss_pct": 0.0,
+    "packets_sent": 146,
+    "packets_received": 146,
+    "packets_lost": 0,
+    "estimated_mos": 4.39,
+    "quality_rating": "EXCELLENT"
+  },
+  {
+    "scenario": "High Latency",
+    "configured_delay_ms": 200.0,
+    "measured_latency_ms": 200.6,
+    "configured_jitter_ms": 5.0,
+    "measured_jitter_ms": 2.23,
+    "configured_loss_pct": 0.0,
+    "measured_loss_pct": 0.0,
+    "packets_sent": 147,
+    "packets_received": 147,
+    "packets_lost": 0,
+    "estimated_mos": 4.16,
+    "quality_rating": "GOOD"
+  },
+  {
+    "scenario": "High Jitter",
+    "configured_delay_ms": 50.0,
+    "measured_latency_ms": 48.08,
+    "configured_jitter_ms": 60.0,
+    "measured_jitter_ms": 32.57,
+    "configured_loss_pct": 0.0,
+    "measured_loss_pct": 0.0,
+    "packets_sent": 146,
+    "packets_received": 146,
+    "packets_lost": 0,
+    "estimated_mos": 4.34,
+    "quality_rating": "EXCELLENT"
+  },
+  {
+    "scenario": "Packet Loss",
+    "configured_delay_ms": 50.0,
+    "measured_latency_ms": 50.65,
+    "configured_jitter_ms": 10.0,
+    "measured_jitter_ms": 5.61,
+    "configured_loss_pct": 10.0,
+    "measured_loss_pct": 6.16,
+    "packets_sent": 146,
+    "packets_received": 137,
+    "packets_lost": 9,
+    "estimated_mos": 1.85,
+    "quality_rating": "BAD"
+  },
+  {
+    "scenario": "Poor Network",
+    "configured_delay_ms": 250.0,
+    "measured_latency_ms": 255.1,
+    "configured_jitter_ms": 80.0,
+    "measured_jitter_ms": 49.51,
+    "configured_loss_pct": 15.0,
+    "measured_loss_pct": 15.07,
+    "packets_sent": 146,
+    "packets_received": 124,
+    "packets_lost": 22,
+    "estimated_mos": 1.0,
+    "quality_rating": "BAD"
+  }
+]

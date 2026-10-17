@@ -1,0 +1,85 @@
+"""
+MOS (Mean Opinion Score) Estimation Engine based on ITU-T G.107 E-model Standard
+"""
+from typing import Dict, Any
+
+class MOSEstimator:
+    """
+    Computes Estimated MOS (1.0 to 5.0) using ITU-T G.107 E-Model methodology.
+    Uses measured Latency, Jitter, and Packet Loss as real-time inputs.
+    """
+
+    @staticmethod
+    def calculate_r_factor(latency_ms: float, jitter_ms: float, packet_loss_pct: float) -> float:
+        """
+        Calculates Transmission Rating Factor R (0 - 100).
+        Formula: R = R0 - Id - Ie_eff
+        """
+        R0 = 93.2  # Base signal-to-noise rating factor
+
+        # 1. Delay Impairment (Id)
+        # Effective one-way delay including jitter buffer overhead
+        effective_delay = latency_ms + (2.0 * jitter_ms) + 10.0
+
+        if effective_delay < 177.0:
+            Id = 0.024 * effective_delay
+        else:
+            Id = 0.024 * effective_delay + 0.11 * (effective_delay - 177.0)
+
+        # 2. Equipment Impairment (Ie_eff) due to Packet Loss
+        # Standard G.711 codec parameters: Ie = 0, Bpl = 4.3
+        Ie = 0.0
+        Bpl = 4.3
+        P_loss = max(0.0, float(packet_loss_pct))
+
+        Ie_eff = Ie + (95.0 - Ie) * (P_loss / (P_loss + Bpl))
+
+        # 3. Overall R-Factor
+        R = R0 - Id - Ie_eff
+        return max(0.0, min(100.0, R))
+
+    @classmethod
+    def calculate_mos(cls, latency_ms: float, jitter_ms: float, packet_loss_pct: float) -> float:
+        """
+        Converts R-factor into Estimated MOS (1.0 to 4.5/5.0).
+        Standard ITU-T G.107 conversion polynomial.
+        """
+        R = cls.calculate_r_factor(latency_ms, jitter_ms, packet_loss_pct)
+
+        if R <= 0:
+            mos = 1.0
+        elif R >= 100:
+            mos = 4.5
+        else:
+            mos = 1.0 + (0.035 * R) + (R * (R - 60.0) * (100.0 - R) * 0.000007)
+
+        return round(max(1.0, min(4.5, mos)), 2)
+
+    @classmethod
+    def classify_quality(cls, mos: float) -> str:
+        """
+        Classifies MOS score into qualitative call quality rating.
+        """
+        if mos >= 4.3:
+            return "EXCELLENT"
+        elif mos >= 4.0:
+            return "GOOD"
+        elif mos >= 3.6:
+            return "FAIR"
+        elif mos >= 3.1:
+            return "POOR"
+        else:
+            return "BAD"
+
+    @classmethod
+    def get_metrics(cls, latency_ms: float, jitter_ms: float, packet_loss_pct: float) -> Dict[str, Any]:
+        """Returns snapshot dictionary of MOS estimation."""
+        r_factor = cls.calculate_r_factor(latency_ms, jitter_ms, packet_loss_pct)
+        mos = cls.calculate_mos(latency_ms, jitter_ms, packet_loss_pct)
+        quality = cls.classify_quality(mos)
+
+        return {
+            "r_factor": round(r_factor, 2),
+            "mos": mos,
+            "quality": quality
+        }
