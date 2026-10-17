@@ -8,8 +8,17 @@ import LatencyChart from './LatencyChart';
 import JitterChart from './JitterChart';
 import PacketLossCard from './PacketLossCard';
 
-const API_BASE = 'http://localhost:8000';
-const WS_URL = 'ws://localhost:8000/ws';
+// When the backend serves this page (production), use the same address.
+// When running "npm run dev" (port 3000), talk to the backend on port 8000.
+// VITE_API_BASE and VITE_WS_URL can override both.
+const isDevServer = window.location.port === '3000';
+const API_BASE =
+  import.meta.env.VITE_API_BASE || (isDevServer ? 'http://localhost:8000' : '');
+const WS_URL =
+  import.meta.env.VITE_WS_URL ||
+  (isDevServer
+    ? 'ws://localhost:8000/ws'
+    : `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}/ws`);
 
 const Dashboard = () => {
   const [metrics, setMetrics] = useState({
@@ -40,6 +49,7 @@ const Dashboard = () => {
   });
 
   const [history, setHistory] = useState([]);
+  const [connected, setConnected] = useState(false);
   const wsRef = useRef(null);
 
   // Initialize WebSocket telemetry stream & fetch current config
@@ -53,9 +63,14 @@ const Dashboard = () => {
       .catch(err => console.log('Config fetch note:', err.message));
 
     // Connect WebSocket
+    let disposed = false;
+    let reconnectTimer = null;
+
     const connectWs = () => {
       const socket = new WebSocket(WS_URL);
       wsRef.current = socket;
+
+      socket.onopen = () => setConnected(true);
 
       socket.onmessage = (event) => {
         try {
@@ -87,8 +102,9 @@ const Dashboard = () => {
       };
 
       socket.onclose = () => {
+        setConnected(false);
         // Auto-reconnect every 2 seconds
-        setTimeout(connectWs, 2000);
+        if (!disposed) reconnectTimer = setTimeout(connectWs, 2000);
       };
 
       socket.onerror = (err) => {
@@ -99,6 +115,8 @@ const Dashboard = () => {
     connectWs();
 
     return () => {
+      disposed = true;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
       if (wsRef.current) wsRef.current.close();
     };
   }, []);
@@ -156,11 +174,13 @@ const Dashboard = () => {
             <PhoneCall size={26} color="var(--accent-blue)" />
             Real-Time VoIP Call Quality Analyzer
           </h1>
-          <p>Computer Networks Project — Review 2 Network Simulation & QoS Monitoring</p>
+          <p>Simulate network problems and watch estimated call quality respond in real time</p>
         </div>
-        <div className={`status-badge ${!isRunning ? 'stopped' : ''}`}>
+        <div className={`status-badge ${!isRunning || !connected ? 'stopped' : ''}`}>
           <div className="status-dot"></div>
-          <span>{isRunning ? '● Simulation Running' : '● Simulation Stopped'}</span>
+          <span>
+            {!connected ? 'Backend offline' : isRunning ? 'Simulation running' : 'Simulation stopped'}
+          </span>
         </div>
       </header>
 
@@ -238,6 +258,11 @@ const Dashboard = () => {
         packetsLost={metrics.packets_lost}
         lossPct={metrics.packet_loss}
       />
+
+      <footer className="app-footer">
+        Synthetic RTP-style traffic over local UDP. Jitter follows RFC 3550 and quality
+        scores use a simplified ITU-T G.107 E-model.
+      </footer>
     </div>
   );
 };

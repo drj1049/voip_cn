@@ -207,27 +207,27 @@ const ControlPanel = ({
         </button>
       </div>
 
-      {/* Predefined Review 2 Demo Scenarios */}
+      {/* Quick scenarios */}
       <div className="presets-container">
         <div className="presets-title" style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
           <Sparkles size={13} color="var(--accent-amber)" />
-          <span>Review 2 Demo Scenarios</span>
+          <span>Quick Scenarios</span>
         </div>
         <div className="preset-buttons-grid">
           <button className="preset-btn" onClick={() => applyPreset(20, 2, 0)}>
-            1. Good Network (20ms/2ms/0%)
+            Good network (20 ms, 2 ms, 0%)
           </button>
           <button className="preset-btn" onClick={() => applyPreset(200, 5, 0)}>
-            2. High Latency (200ms/5ms/0%)
+            High latency (200 ms, 5 ms, 0%)
           </button>
           <button className="preset-btn" onClick={() => applyPreset(50, 60, 0)}>
-            3. High Jitter (50ms/60ms/0%)
+            High jitter (50 ms, 60 ms, 0%)
           </button>
           <button className="preset-btn" onClick={() => applyPreset(50, 10, 10)}>
-            4. Packet Loss (50ms/10ms/10%)
+            Packet loss (50 ms, 10 ms, 10%)
           </button>
           <button className="preset-btn" onClick={() => applyPreset(250, 80, 15)}>
-            5. Poor Network (250ms/80ms/15%)
+            Poor network (250 ms, 80 ms, 15%)
           </button>
         </div>
       </div>

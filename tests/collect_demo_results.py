@@ -1,5 +1,5 @@
 """
-Automated Test & Empirical Results Data Collector for Review 2 Scenarios
+Empirical results collector for the five standard demo scenarios
 Runs live VoIP UDP simulation for each scenario and records actual empirical measurements.
 """
 import time

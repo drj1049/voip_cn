@@ -15,7 +15,7 @@ from backend.websocket_manager import websocket_manager
 
 app = FastAPI(
     title="Real-Time VoIP Call Quality Analyzer",
-    description="Computer Networks Review 2 Project Simulation & QoS Metric Analysis Engine",
+    description="Network impairment simulation and live VoIP call quality (QoS and MOS) analysis",
     version="1.0.0"
 )
 
