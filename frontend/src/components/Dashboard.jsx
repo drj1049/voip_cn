@@ -165,6 +165,21 @@ const Dashboard = () => {
 
   const isRunning = metrics.status === 'RUNNING';
 
+  // Display helpers
+  const fmt = (v) => (v ? Number(v).toFixed(1) : '0.0');
+  const bufferOn = metrics.buffer_mode && metrics.buffer_mode !== 'off';
+  const qualityLabel = metrics.quality
+    ? metrics.quality.charAt(0) + metrics.quality.slice(1).toLowerCase()
+    : '';
+  const QUALITY_COLORS = {
+    EXCELLENT: '#10b981',
+    GOOD: '#06b6d4',
+    FAIR: '#f59e0b',
+    POOR: '#f97316',
+    BAD: '#ef4444'
+  };
+  const qualityColor = QUALITY_COLORS[metrics.quality] || 'var(--accent-emerald)';
+
   return (
     <div className="app-container">
       {/* Header */}
@@ -201,45 +216,49 @@ const Dashboard = () => {
         />
       </div>
 
-      {/* 4 KPI Metric Cards */}
+      {/* Key metrics */}
       <div className="metric-cards-grid">
         <MetricCard
-          title="LATENCY"
-          value={metrics.latency ? metrics.latency.toFixed(1) : '0.0'}
+          title="Latency"
+          value={fmt(metrics.latency)}
           unit="ms"
-          subValue={`Average: ${metrics.latency_avg ? metrics.latency_avg.toFixed(1) : '0.0'} ms (Min: ${metrics.latency_min ? metrics.latency_min.toFixed(1) : '0'} / Max: ${metrics.latency_max ? metrics.latency_max.toFixed(1) : '0'})`}
+          subValue={`Average ${fmt(metrics.latency_avg)} ms · Max ${fmt(metrics.latency_max)} ms`}
           color="var(--accent-blue)"
           icon={Activity}
         />
 
         <MetricCard
-          title="JITTER (RFC 3550)"
-          value={metrics.jitter ? metrics.jitter.toFixed(1) : '0.0'}
+          title="Jitter"
+          value={fmt(metrics.jitter)}
           unit="ms"
           subValue={
-            metrics.buffer_mode && metrics.buffer_mode !== 'off'
-              ? `Buffer: ${metrics.buffer_mode} ${Number(metrics.buffer_ms).toFixed(0)} ms | Late packets: ${Number(metrics.late_pct).toFixed(1)}%`
-              : 'Standard RFC 3550 Interarrival Deviation'
+            bufferOn
+              ? `${metrics.buffer_mode} buffer ${Number(metrics.buffer_ms).toFixed(0)} ms · ${Number(metrics.late_pct).toFixed(1)}% late`
+              : 'RFC 3550 interarrival jitter'
           }
           color="var(--accent-purple)"
           icon={Waves}
         />
 
         <MetricCard
-          title="PACKET LOSS"
-          value={metrics.packet_loss ? metrics.packet_loss.toFixed(1) : '0.0'}
+          title="Packet loss"
+          value={fmt(metrics.packet_loss)}
           unit="%"
-          subValue={`${metrics.packets_lost} lost / ${metrics.packets_sent} sent${metrics.burst_ratio > 1.2 ? ' | burst ratio ' + Number(metrics.burst_ratio).toFixed(1) : ''}`}
+          subValue={`${metrics.packets_lost} of ${metrics.packets_sent} packets${metrics.burst_ratio > 1.2 ? ' · bursty' : ''}`}
           color={metrics.packet_loss > 5 ? 'var(--accent-red)' : 'var(--accent-emerald)'}
           icon={ShieldAlert}
         />
 
         <MetricCard
-          title="ESTIMATED MOS"
+          title="Estimated MOS"
           value={metrics.mos ? metrics.mos.toFixed(2) : '1.00'}
           unit="/ 5.0"
-          subValue={`Rating: ${metrics.quality} (ITU-T G.107 E-model)${metrics.buffer_mode && metrics.buffer_mode !== 'off' ? ' | Effective loss ' + Number(metrics.effective_loss).toFixed(1) + '% | Playout delay ' + Number(metrics.playout_delay).toFixed(0) + ' ms' : ''}`}
-          color="var(--accent-emerald)"
+          subValue={
+            bufferOn
+              ? `${qualityLabel} · playout delay ${Number(metrics.playout_delay).toFixed(0)} ms`
+              : `${qualityLabel} · ITU-T G.107`
+          }
+          color={qualityColor}
           icon={Award}
         />
       </div>

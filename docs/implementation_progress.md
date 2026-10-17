@@ -23,7 +23,7 @@
 
 1. **System Architecture & Design**: Documented in `docs/architecture.md`.
 2. **Algorithms & Methodology**: Documented in `docs/methodology.md`.
-3. **Automated Test Suite**: 9 unit and integration tests passing in `tests/`.
+3. **Automated Test Suite**: 21 unit and integration tests passing in `tests/`.
 4. **Empirical Results Data**: Collected in `tests/demo_results.json` and `docs/test_cases.md`.
 5. **Live Working Prototype**: Executable local server and React UI dashboard.
 
