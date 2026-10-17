@@ -38,3 +38,25 @@ def test_in_flight_packets_not_counted_as_lost():
     final = calc.get_metrics(final=True)
     assert final["packets_lost"] == 4
     assert final["loss_percentage"] == 40.0
+
+
+def test_live_loss_recovers_with_rolling_window():
+    # 50 packets with every 5th one lost, then 300 perfect packets
+    calc = PacketLossCalculator(window_size=250)
+    seq = 0
+    for i in range(50):
+        seq += 1
+        calc.record_sent()
+        if i % 5 != 4:
+            calc.add_received_packet({"sequence_number": seq})
+    assert calc.get_metrics()["loss_percentage"] > 10.0
+
+    for _ in range(300):
+        seq += 1
+        calc.record_sent()
+        calc.add_received_packet({"sequence_number": seq})
+
+    # Old losses have scrolled out of the window, so live loss is back to 0
+    assert calc.get_metrics()["loss_percentage"] == 0.0
+    # Full-run total still remembers them
+    assert calc.get_metrics()["packets_lost"] >= 9

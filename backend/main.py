@@ -2,9 +2,12 @@
 FastAPI Main Server Application for Real-Time VoIP Call Quality Analyzer
 """
 import asyncio
+import os
 from typing import Optional
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from backend.simulation.simulator import VoIPSimulator
@@ -23,6 +26,12 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+)
+
+# Built React dashboard (created by "npm run build" inside frontend/).
+# When it exists, the backend serves it too, so one command runs everything.
+FRONTEND_DIST = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "frontend", "dist"
 )
 
 # Global VoIP Simulator Instance
@@ -45,7 +54,10 @@ def shutdown_event():
 
 @app.get("/")
 def get_root():
-    """Root endpoint verifying API availability."""
+    """Serves the dashboard if it has been built, otherwise reports API status."""
+    index_file = os.path.join(FRONTEND_DIST, "index.html")
+    if os.path.isfile(index_file):
+        return FileResponse(index_file)
     return {
         "project": "Real-Time VoIP Call Quality Analyzer",
         "status": "Online",
@@ -110,3 +122,8 @@ async def websocket_endpoint(websocket: WebSocket):
         websocket_manager.disconnect(websocket)
     except Exception:
         websocket_manager.disconnect(websocket)
+
+
+# Static files for the built dashboard (JS and CSS bundles)
+if os.path.isdir(os.path.join(FRONTEND_DIST, "assets")):
+    app.mount("/assets", StaticFiles(directory=os.path.join(FRONTEND_DIST, "assets")), name="assets")

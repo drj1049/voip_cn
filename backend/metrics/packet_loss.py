@@ -2,6 +2,7 @@
 Packet Loss Calculation Engine based on RFC 3550 Sequence Tracking
 Handles sequence gaps, packet reordering, and initial/trailing dropped packets accurately.
 """
+from collections import deque
 from typing import Dict, Any
 
 class PacketLossCalculator:
@@ -10,7 +11,13 @@ class PacketLossCalculator:
     Calculates total packets expected, total received, total lost, and loss percentage.
     """
 
-    def __init__(self):
+    def __init__(self, window_size: int = 250):
+        # Rolling window of the most recent packet outcomes (True = arrived,
+        # False = lost). 250 packets is about 5 seconds of a 50 packets/sec call.
+        # The live loss percentage uses this window so the dashboard recovers
+        # soon after the network improves. Full-run totals are still kept.
+        self.window_size: int = window_size
+        self._window = deque(maxlen=window_size)
         self.packets_sent: int = 0
         self.packets_received: int = 0
         self.sequence_gap_lost: int = 0
@@ -30,6 +37,7 @@ class PacketLossCalculator:
 
         if self.max_seq_received == -1:
             self.max_seq_received = seq
+            self._window.append(True)
             return
 
         # Calculate forward difference with 16-bit wraparound (65536)
@@ -40,12 +48,21 @@ class PacketLossCalculator:
             gap = diff - 1
             if gap > 0:
                 self.sequence_gap_lost += gap
+                for _ in range(min(gap, self.window_size)):
+                    self._window.append(False)
+            self._window.append(True)
             self.max_seq_received = seq
         else:
             # Reordered / late packet (seq <= max_seq_received)
             # Reduce gap count if previously counted as lost
             if self.sequence_gap_lost > 0:
                 self.sequence_gap_lost -= 1
+            # The late packet was marked lost earlier, so mark the most recent
+            # lost slot in the window as arrived.
+            for i in range(len(self._window) - 1, -1, -1):
+                if not self._window[i]:
+                    self._window[i] = True
+                    break
 
     def get_packets_lost(self, final: bool = False) -> int:
         """
@@ -68,11 +85,15 @@ class PacketLossCalculator:
         """
         Calculates loss percentage relative to total expected packets.
         """
+        if not final:
+            # Live view: loss over the last window_size packets only
+            if not self._window:
+                return 0.0
+            window_lost = sum(1 for arrived in self._window if not arrived)
+            return (window_lost / len(self._window)) * 100.0
+
         lost = self.get_packets_lost(final)
-        if final:
-            total_expected = max(self.packets_sent, self.packets_received + lost)
-        else:
-            total_expected = self.packets_received + lost
+        total_expected = max(self.packets_sent, self.packets_received + lost)
         if total_expected == 0:
             return 0.0
 
@@ -95,3 +116,4 @@ class PacketLossCalculator:
         self.packets_received = 0
         self.sequence_gap_lost = 0
         self.max_seq_received = -1
+        self._window.clear()
