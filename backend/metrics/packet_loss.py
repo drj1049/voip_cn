@@ -47,34 +47,46 @@ class PacketLossCalculator:
             if self.sequence_gap_lost > 0:
                 self.sequence_gap_lost -= 1
 
-    def get_packets_lost(self) -> int:
+    def get_packets_lost(self, final: bool = False) -> int:
         """
-        Returns total packets lost combining sequence gap tracking
-        and sent-vs-received count to capture trailing drops.
-        """
-        sent_delta_lost = max(0, self.packets_sent - self.packets_received)
-        return max(self.sequence_gap_lost, sent_delta_lost)
+        Returns total packets lost.
 
-    def get_loss_percentage(self) -> float:
+        While a call is live, only sequence gaps count as lost. A packet that
+        is still travelling (for example under a long delay) has not arrived
+        yet, but it is not lost either, so sent minus received is not used.
+
+        When final=True (sender stopped and in-flight packets have drained),
+        sent minus received is also checked so drops at the very end of a run
+        are counted too.
+        """
+        if final:
+            sent_delta_lost = max(0, self.packets_sent - self.packets_received)
+            return max(self.sequence_gap_lost, sent_delta_lost)
+        return self.sequence_gap_lost
+
+    def get_loss_percentage(self, final: bool = False) -> float:
         """
         Calculates loss percentage relative to total expected packets.
         """
-        lost = self.get_packets_lost()
-        total_expected = max(self.packets_sent, self.packets_received + lost)
+        lost = self.get_packets_lost(final)
+        if final:
+            total_expected = max(self.packets_sent, self.packets_received + lost)
+        else:
+            total_expected = self.packets_received + lost
         if total_expected == 0:
             return 0.0
-        
+
         loss_pct = (lost / total_expected) * 100.0
         return min(100.0, max(0.0, loss_pct))
 
-    def get_metrics(self) -> Dict[str, Any]:
+    def get_metrics(self, final: bool = False) -> Dict[str, Any]:
         """Returns snapshot of packet loss statistics."""
-        lost = self.get_packets_lost()
+        lost = self.get_packets_lost(final)
         return {
             "packets_sent": self.packets_sent,
             "packets_received": self.packets_received,
             "packets_lost": lost,
-            "loss_percentage": round(self.get_loss_percentage(), 2)
+            "loss_percentage": round(self.get_loss_percentage(final), 2)
         }
 
     def reset(self):

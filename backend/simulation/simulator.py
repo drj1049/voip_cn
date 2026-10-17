@@ -187,7 +187,10 @@ class VoIPSimulator:
         """Returns compiled snapshot of metrics for frontend WebSocket/REST API."""
         with self._lock:
             latency_data = self.latency_calc.get_metrics()
-            loss_data = self.packet_loss_calc.get_metrics()
+            # In-flight packets only count as lost once the stream has ended
+            # (sender stopped or simulation stopped) and they have had time to arrive.
+            final = (not self.is_running) or (not getattr(self, '_sender_active', True))
+            loss_data = self.packet_loss_calc.get_metrics(final)
             jitter_data = self.jitter_calc.get_metrics()
 
             # MOS Estimation using current metrics
