@@ -23,6 +23,8 @@ app = FastAPI(
 )
 
 # Enable CORS for React frontend interaction
+# (CORS lets the dashboard on port 3000 talk to this server on port 8000 during development.
+# "*" means any origin is allowed, which is fine for a project like this one.)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -38,8 +40,12 @@ FRONTEND_DIST = os.path.join(
 )
 
 # Global VoIP Simulator Instance
+# There is only one simulation for the whole app, so everyone who opens the dashboard
+# (including on Render) sees and controls the same call.
 simulator = VoIPSimulator()
 
+# What the dashboard sends when a slider moves. Every field is optional, so the dashboard
+# can send only what changed. The ge/le limits make the API reject silly values with an error.
 class ImpairmentConfigRequest(BaseModel):
     delay_ms: Optional[float] = Field(None, ge=0.0, le=500.0, description="Base delay in ms (0-500)")
     jitter_ms: Optional[float] = Field(None, ge=0.0, le=100.0, description="Jitter variation in ms (0-100)")
@@ -51,7 +57,8 @@ class ImpairmentConfigRequest(BaseModel):
 
 @app.on_event("startup")
 def startup_event():
-    """Starts the VoIP simulation by default upon server launch."""
+    """Starts the VoIP simulation by default upon server launch.
+    The call is already running by the time you open the dashboard."""
     simulator.start()
 
 @app.on_event("shutdown")
@@ -62,6 +69,7 @@ def shutdown_event():
 @app.get("/")
 def get_root():
     """Serves the dashboard if it has been built, otherwise reports API status."""
+    # If "npm run build" has been run, show the dashboard; otherwise show a small status message
     index_file = os.path.join(FRONTEND_DIST, "index.html")
     if os.path.isfile(index_file):
         return FileResponse(index_file)
@@ -73,7 +81,8 @@ def get_root():
 
 @app.get("/status")
 def get_status():
-    """Returns simulator running state."""
+    """Returns simulator running state.
+    Render also calls this to check that the app is alive (see healthCheckPath in render.yaml)."""
     return {
         "is_running": simulator.is_running,
         "config": simulator.get_config()
@@ -124,6 +133,8 @@ def update_config(req: ImpairmentConfigRequest):
         "current_config": simulator.get_config()
     }
 
+# Audio mode. The dashboard shrinks every clip to 8 kHz mono before uploading, so even a
+# 30 second clip is well under 0.5 MB. The 2 MB cap just stops someone sending something huge.
 MAX_AUDIO_UPLOAD_BYTES = 2 * 1024 * 1024   # a 30 second 8 kHz clip is under 0.5 MB
 
 @app.post("/audio/process")
@@ -144,6 +155,7 @@ async def process_audio_clip(
     the given settings, and rebuilt. Returns the metrics plus the original and
     damaged audio as base64 WAV so the dashboard can play both.
     """
+    # Check the text options by hand (a clear 400 error beats a confusing crash later)
     if loss_mode not in ("random", "burst"):
         raise HTTPException(status_code=400, detail="loss_mode must be random or burst")
     if buffer_mode not in ("off", "fixed", "adaptive"):
@@ -162,12 +174,16 @@ async def process_audio_clip(
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc))
 
+    # The processing is plain CPU work, so run it in a worker thread. Otherwise the server
+    # would freeze (and the live WebSocket updates would stall) while the clip is processed.
     result = await run_in_threadpool(
         process_audio, samples,
         delay_ms=delay_ms, jitter_ms=jitter_ms, packet_loss_pct=packet_loss_pct,
         loss_mode=loss_mode, burst_length=burst_length,
         buffer_mode=buffer_mode, buffer_ms=buffer_ms,
     )
+    # JSON cannot hold raw bytes, so the audio goes back as base64 text. The browser plays
+    # it straight from a data: URL.
     result["original_wav"] = base64.b64encode(result["original_wav"]).decode("ascii")
     result["damaged_wav"] = base64.b64encode(result["damaged_wav"]).decode("ascii")
     return result
@@ -177,6 +193,7 @@ async def websocket_endpoint(websocket: WebSocket):
     """WebSocket stream transmitting live telemetry metrics to the dashboard."""
     await websocket_manager.connect(websocket)
     try:
+        # Push the current numbers to this browser four times a second until it disconnects
         while True:
             metrics = simulator.get_current_metrics()
             await websocket.send_json(metrics)
@@ -187,6 +204,7 @@ async def websocket_endpoint(websocket: WebSocket):
         websocket_manager.disconnect(websocket)
 
 
-# Static files for the built dashboard (JS and CSS bundles)
+# Static files for the built dashboard (JS and CSS bundles).
+# Only mounted when "npm run build" has produced them.
 if os.path.isdir(os.path.join(FRONTEND_DIST, "assets")):
     app.mount("/assets", StaticFiles(directory=os.path.join(FRONTEND_DIST, "assets")), name="assets")

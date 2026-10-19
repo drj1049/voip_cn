@@ -1,5 +1,10 @@
+# Web framework that provides the API and WebSocket
 fastapi>=0.100.0
+# Server that runs the FastAPI app
 uvicorn[standard]>=0.22.0
+# WebSocket support for the live dashboard stream
 websockets>=11.0
+# Used by audio mode to handle the audio samples
 numpy>=1.24.0
+# Only needed for running the tests
 pytest>=7.0.0

@@ -15,7 +15,9 @@ class UDPReceiver:
         self.bind_ip: str = bind_ip
         self.bind_port: int = bind_port
         self.sock: socket.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        # Enable address reuse and set timeout so non-blocking loops can check exit flags
+        # Address reuse lets us restart quickly without "address already in use" errors.
+        # The timeout stops recvfrom from waiting forever, so the loop in the simulator
+        # gets a chance to notice when it has been told to stop.
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.sock.bind((self.bind_ip, self.bind_port))
         self.sock.settimeout(timeout_sec)
@@ -28,14 +30,16 @@ class UDPReceiver:
         """
         try:
             data, addr = self.sock.recvfrom(2048)
+            # Stamp the arrival time right away, before doing anything slow like parsing JSON,
+            # so the measured delay is as accurate as possible
             receive_time = time.time()
             packet_dict = json.loads(data.decode("utf-8"))
             packet_dict["receive_time"] = receive_time
             return packet_dict
         except socket.timeout:
-            return None
+            return None   # nothing arrived in this time slot, that is normal
         except Exception:
-            return None
+            return None   # a broken or half-read packet is treated like no packet
 
     def close(self):
         """Closes the receiver UDP socket."""

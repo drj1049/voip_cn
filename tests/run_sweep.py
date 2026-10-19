@@ -17,6 +17,7 @@ import os
 import sys
 import time
 
+# Lets this script import the backend package when run as "python tests/run_sweep.py"
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from backend.simulation.simulator import VoIPSimulator  # noqa: E402
 
@@ -25,6 +26,7 @@ RUN_SECONDS = 8.0      # about 400 packets per setting
 DRAIN_SECONDS = 0.7    # lets delayed packets arrive before reading final numbers
 BASE = {"delay_ms": 20.0, "jitter_ms": 2.0, "packet_loss_pct": 0.0}
 
+# The values tried for each knob, in steps from the minimum to the maximum the app allows
 SWEEPS = {
     "delay_ms": [0, 50, 100, 150, 200, 250, 300, 350, 400, 450, 500],
     "jitter_ms": [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100],
@@ -32,13 +34,15 @@ SWEEPS = {
 }
 
 
+# Runs one simulation with the given settings and returns what was measured.
+# Every run gets its own UDP port so a previous run's leftovers cannot interfere.
 def run_point(cfg, port):
     sim = VoIPSimulator(target_port=port)
     sim.update_config(**cfg)
     sim.start()
     time.sleep(RUN_SECONDS)
-    sim.stop_sender()
-    time.sleep(DRAIN_SECONDS)
+    sim.stop_sender()                # stop sending, but keep listening...
+    time.sleep(DRAIN_SECONDS)        # ...so packets still travelling can arrive before we read the result
     m = sim.get_current_metrics()
     sim.stop()
     return {
@@ -59,10 +63,11 @@ def run_point(cfg, port):
 def main():
     os.makedirs(OUT_DIR, exist_ok=True)
     results = {}
-    port = 5100
+    port = 5100   # first port used; each run adds 1
     for knob, values in SWEEPS.items():
         results[knob] = []
         for v in values:
+            # Start from the healthy baseline and change only the knob being swept
             cfg = dict(BASE)
             cfg[knob] = float(v)
             row = run_point(cfg, port)
@@ -87,6 +92,7 @@ def main():
                             r["measured_jitter_ms"], r["measured_loss_pct"], r["packets_sent"],
                             r["packets_received"], r["r_factor"], r["mos"], r["quality"]])
 
+    # Graphs are optional: if matplotlib is not installed we still keep the data files
     try:
         make_graphs(results)
     except ImportError:
@@ -103,6 +109,7 @@ def make_graphs(results):
         "jitter_ms": ("Configured jitter (ms)", "configured_jitter_ms", "MOS vs jitter"),
         "packet_loss_pct": ("Configured packet loss (%)", "configured_loss_pct", "MOS vs packet loss"),
     }
+    # Coloured bands behind the line show which rating (Excellent...Bad) each MOS value falls in
     bands = [(4.3, 4.5, "Excellent"), (4.0, 4.3, "Good"), (3.6, 4.0, "Fair"),
              (3.1, 3.6, "Poor"), (1.0, 3.1, "Bad")]
     shades = ["#d8f0dc", "#e6f4d7", "#fbf3cf", "#fbe3c8", "#f8d4d4"]
@@ -124,7 +131,8 @@ def make_graphs(results):
         fig.savefig(os.path.join(OUT_DIR, f"mos_vs_{knob}.png"), dpi=150)
         plt.close(fig)
 
-    # measured vs configured for the three knobs
+    # measured vs configured for the three knobs. A dashed "ideal" line shows where the points
+    # would sit if the measurement matched the setting exactly, so you can see how close they are.
     fig, axes = plt.subplots(1, 3, figsize=(13, 4))
     pairs = [("delay_ms", "configured_delay_ms", "measured_latency_ms", "Delay (ms)"),
              ("jitter_ms", "configured_jitter_ms", "measured_jitter_ms", "Jitter (ms)"),

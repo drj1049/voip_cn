@@ -13,6 +13,7 @@ from backend.audio.processor import (
 )
 
 
+# Helper: wrap raw samples in a proper WAV file in memory, like an uploaded file would be.
 def _wav_bytes(samples, rate=SAMPLE_RATE, channels=1, width=2):
     buf = io.BytesIO()
     with wave.open(buf, "wb") as wf:
@@ -23,11 +24,13 @@ def _wav_bytes(samples, rate=SAMPLE_RATE, channels=1, width=2):
     return buf.getvalue()
 
 
+# Writing a clip to WAV and reading it back must give exactly the same samples.
 def test_wav_roundtrip():
     clip = make_demo_clip(2.0)
     assert np.array_equal(decode_wav(encode_wav(clip)), clip)
 
 
+# A 1 second, 44.1 kHz stereo file should come out as about 1 second of mono 8 kHz audio.
 def test_decode_resamples_and_mixes_to_mono_8k():
     t = np.arange(44100) / 44100.0
     tone = (np.sin(2 * np.pi * 440 * t) * 10000).astype("<i2")
@@ -36,6 +39,7 @@ def test_decode_resamples_and_mixes_to_mono_8k():
     assert abs(len(out) - SAMPLE_RATE) <= 2          # 1 second at 8 kHz
 
 
+# Junk bytes and clips over 30 seconds must raise ValueError (the API turns it into a 400).
 def test_decode_rejects_bad_input():
     for bad in (b"not a wav file", b""):
         try:
@@ -51,8 +55,9 @@ def test_decode_rejects_bad_input():
         pass
 
 
+# A perfect network must hand back the audio exactly as it went in.
 def test_clean_network_leaves_audio_untouched():
-    random.seed(1)
+    random.seed(1)   # fixed seed so the test gives the same result every run
     clip = make_demo_clip(4.0)
     r = process_audio(clip, delay_ms=20, jitter_ms=0, packet_loss_pct=0)
     assert set(r["frames"]) == {PLAYED}
@@ -61,6 +66,7 @@ def test_clean_network_leaves_audio_untouched():
     assert r["metrics"]["packets_lost"] == 0
 
 
+# Every lost frame must be silent in the output, and frames that arrived must be untouched.
 def test_loss_becomes_silence_in_the_right_places():
     random.seed(2)
     clip = make_demo_clip(8.0)
@@ -78,6 +84,7 @@ def test_loss_becomes_silence_in_the_right_places():
     assert r["metrics"]["packets_lost"] == len(lost)
 
 
+# More packet loss must always mean a lower score.
 def test_worse_network_gives_lower_mos():
     clip = make_demo_clip(8.0)
     scores = []
@@ -87,6 +94,7 @@ def test_worse_network_gives_lower_mos():
     assert scores[0] > scores[1] > scores[2]
 
 
+# Jitter only damages the audio when a buffer is on, because that is what discards late packets.
 def test_jitter_is_only_audible_with_a_buffer():
     clip = make_demo_clip(8.0)
     random.seed(4)
@@ -99,6 +107,7 @@ def test_jitter_is_only_audible_with_a_buffer():
     assert with_buffer["metrics"]["packets_late"] == with_buffer["frames"].count(LATE)
 
 
+# Smoke test: bursty loss works end to end in audio mode.
 def test_burst_mode_runs():
     random.seed(5)
     r = process_audio(make_demo_clip(8.0), packet_loss_pct=10, loss_mode="burst", burst_length=6)

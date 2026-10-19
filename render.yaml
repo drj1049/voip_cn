@@ -1,7 +1,9 @@
+# Tells Render how to deploy this project (a "Blueprint"). Render reads this file and
+# builds the app using the Dockerfile in the same folder.
 services:
   - type: web
     name: voip-quality-analyzer
-    runtime: docker
-    plan: free
-    healthCheckPath: /status
-    autoDeploy: true
+    runtime: docker              # build from the Dockerfile
+    plan: free                   # free tier: sleeps after about 15 minutes with no visitors
+    healthCheckPath: /status     # Render calls this URL to check the app is alive
+    autoDeploy: true             # rebuild automatically on every push to the connected branch

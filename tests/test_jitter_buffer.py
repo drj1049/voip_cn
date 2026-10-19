@@ -5,10 +5,12 @@ import pytest
 from backend.metrics.jitter_buffer import JitterBuffer
 
 
+# Helper: build a fake packet that took transit_ms to arrive.
 def pkt(transit_ms, send=0.0):
     return {"send_time": send, "receive_time": send + transit_ms / 1000.0}
 
 
+# With the buffer off, even a very slow packet is accepted.
 def test_buffer_off_accepts_everything():
     buf = JitterBuffer(mode="off")
     assert buf.process(pkt(20)) is True
@@ -16,6 +18,7 @@ def test_buffer_off_accepts_everything():
     assert buf.late_pct(final=True) == 0.0
 
 
+# A packet is late if it arrives more than "buffer depth" after the fastest packet.
 def test_fixed_buffer_discards_late_packets():
     buf = JitterBuffer(mode="fixed", fixed_ms=40.0)
     assert buf.process(pkt(50)) is True      # sets the fastest transit (50 ms)
@@ -24,6 +27,7 @@ def test_fixed_buffer_discards_late_packets():
     assert buf.late_pct(final=True) == pytest.approx(100.0 / 3.0, abs=0.01)
 
 
+# The trade-off: a deeper buffer throws away fewer packets but makes the call lag more.
 def test_bigger_buffer_discards_fewer_but_adds_delay():
     transits = [50, 62, 95, 55, 130, 58, 70, 52, 110, 60]
     small, large = JitterBuffer("fixed", 20.0), JitterBuffer("fixed", 100.0)
@@ -34,6 +38,7 @@ def test_bigger_buffer_discards_fewer_but_adds_delay():
     assert large.playout_delay_ms() > small.playout_delay_ms()
 
 
+# Adaptive mode sizes the buffer from the measured jitter, within a minimum and maximum.
 def test_adaptive_buffer_follows_jitter_and_is_clamped():
     buf = JitterBuffer(mode="adaptive")
     buf.process(pkt(50), jitter_ms=0.5)
@@ -44,6 +49,7 @@ def test_adaptive_buffer_follows_jitter_and_is_clamped():
     assert buf.current_ms == JitterBuffer.ADAPTIVE_MAX_MS      # clamped at the maximum
 
 
+# Changing the mode starts the counts over so old numbers do not leak into the new mode.
 def test_switching_mode_resets_statistics():
     buf = JitterBuffer(mode="fixed", fixed_ms=10.0)
     buf.process(pkt(50))

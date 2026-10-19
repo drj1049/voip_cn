@@ -34,20 +34,23 @@ class JitterBuffer:
     BASELINE_WINDOW = 150
 
     def __init__(self, mode: str = "off", fixed_ms: float = 40.0, window_size: int = 250):
+        # An unknown mode name quietly falls back to "off" instead of crashing
         self.mode: str = mode if mode in self.MODES else "off"
-        self.fixed_ms: float = float(fixed_ms)
+        self.fixed_ms: float = float(fixed_ms)       # depth used in "fixed" mode
         self.window_size: int = window_size
+        # Recent outcomes only (about 5 seconds), so the late % on screen recovers
+        # when the network gets better. The whole-run counts are kept separately below.
         self._window = deque(maxlen=window_size)   # True = played on time, False = late
         self._transits = deque(maxlen=self.BASELINE_WINDOW)   # recent transit times (ms)
         self.min_transit_ms: Optional[float] = None
         self.current_ms: float = self.fixed_ms if self.mode == "fixed" else 0.0
-        self.on_time_count: int = 0
+        self.on_time_count: int = 0                  # whole-run totals
         self.late_count: int = 0
 
     def configure(self, mode: Optional[str] = None, fixed_ms: Optional[float] = None):
         """Changes mode and/or fixed depth. Switching mode restarts the statistics."""
         if fixed_ms is not None:
-            self.fixed_ms = max(0.0, min(300.0, float(fixed_ms)))
+            self.fixed_ms = max(0.0, min(300.0, float(fixed_ms)))   # keep depth between 0 and 300 ms
         if mode is not None and mode in self.MODES and mode != self.mode:
             self.mode = mode
             self.reset()
@@ -62,18 +65,23 @@ class JitterBuffer:
         Returns True if the packet would be played, False if it is discarded as late.
         """
         if self.mode == "off":
-            return True
+            return True   # no buffer means nothing is ever thrown away
 
+        # How long this packet took to arrive
         transit_ms = max(0.0, (packet["receive_time"] - packet["send_time"]) * 1000.0)
+        # The fastest recent packet is our best guess of the "normal" trip time.
+        # Anything much slower than that is a candidate for being too late.
         self._transits.append(transit_ms)
         self.min_transit_ms = min(self._transits)
 
         if self.mode == "fixed":
             self.current_ms = self.fixed_ms
         else:
+            # Adaptive: the worse the measured jitter, the deeper the buffer, within limits
             depth = self.ADAPTIVE_FACTOR * jitter_ms
             self.current_ms = max(self.ADAPTIVE_MIN_MS, min(self.ADAPTIVE_MAX_MS, depth))
 
+        # The rule: a packet is on time if it arrived within "buffer depth" of the fastest packet
         on_time = transit_ms <= self.min_transit_ms + self.current_ms
         if on_time:
             self.on_time_count += 1
@@ -93,7 +101,8 @@ class JitterBuffer:
         return (late / len(self._window)) * 100.0
 
     def playout_delay_ms(self) -> float:
-        """Delay a listener experiences: fastest transit plus buffer depth."""
+        """Delay a listener experiences: fastest transit plus buffer depth.
+        This is the price of the buffer: a deeper buffer saves more packets but adds more delay."""
         base = self.min_transit_ms if self.min_transit_ms is not None else 0.0
         return base + self.current_ms
 

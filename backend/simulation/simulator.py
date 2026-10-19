@@ -28,6 +28,8 @@ class VoIPSimulator:
         self.target_ip: str = target_ip
         self.target_port: int = target_port
 
+        # The pieces of the pipeline. A packet goes: generator -> impairment (may be dropped
+        # or delayed) -> UDP sender -> UDP receiver -> the metric calculators below.
         # Components initialization
         self.generator = PacketGenerator()
         self.impairment = ImpairmentEngine(
@@ -38,13 +40,15 @@ class VoIPSimulator:
         self.sender: Optional[UDPSender] = None
         self.receiver: Optional[UDPReceiver] = None
 
-        # Metrics Engines
+        # Metrics Engines (the receiver feeds every arriving packet to all of these)
         self.latency_calc = LatencyCalculator()
         self.packet_loss_calc = PacketLossCalculator()
         self.jitter_calc = RFC3550JitterCalculator()
         self.jitter_buffer = JitterBuffer()
 
         # Threading state control
+        # Two background threads run the call: one sends packets, one receives them.
+        # The lock stops them (and the web requests) from changing shared numbers at the same time.
         self.is_running: bool = False
         self._sender_thread: Optional[threading.Thread] = None
         self._receiver_thread: Optional[threading.Thread] = None
@@ -54,6 +58,7 @@ class VoIPSimulator:
                       loss_mode: Optional[str] = None, burst_length: Optional[float] = None,
                       buffer_mode: Optional[str] = None, buffer_ms: Optional[float] = None):
         """Updates impairment engine and jitter buffer parameters in real time."""
+        # This is called while the call is running, so the sliders take effect immediately
         with self._lock:
             self.impairment.update_config(delay_ms, jitter_ms, packet_loss_pct, loss_mode, burst_length)
             self.jitter_buffer.configure(buffer_mode, buffer_ms)
@@ -77,6 +82,7 @@ class VoIPSimulator:
             if self.is_running:
                 return False
 
+            # Open the receiving socket and the sending socket pointing at it
             self.sender = UDPSender(self.target_ip, self.target_port)
             self.receiver = UDPReceiver(self.target_ip, self.target_port)
 
@@ -85,6 +91,7 @@ class VoIPSimulator:
             self._sender_thread = threading.Thread(target=self._sender_loop, daemon=True)
             self._receiver_thread = threading.Thread(target=self._receiver_loop, daemon=True)
 
+            # Start the listener first so it is ready before the first packet is sent
             self._receiver_thread.start()
             self._sender_thread.start()
             return True
@@ -97,6 +104,8 @@ class VoIPSimulator:
 
             self.is_running = False
 
+        # Wait for the threads to notice the flag and finish. This happens outside the lock
+        # because the threads need the lock themselves to exit.
         if self._sender_thread and self._sender_thread.is_alive():
             self._sender_thread.join(timeout=1.0)
 
@@ -114,7 +123,8 @@ class VoIPSimulator:
         return True
 
     def stop_sender(self):
-        """Stops the packet generator thread while keeping the receiver active to drain in-flight packets."""
+        """Stops the packet generator thread while keeping the receiver active to drain in-flight packets.
+        Used by the test scripts: packets that are still travelling get time to arrive before final numbers are read."""
         with self._lock:
             self._sender_active = False
 
@@ -123,6 +133,7 @@ class VoIPSimulator:
 
     def reset(self):
         """Resets all simulation counters and metric history."""
+        # Stop the call, wipe every counter, then start again if it was running before
         was_running = self.is_running
         if was_running:
             self.stop()
@@ -146,6 +157,7 @@ class VoIPSimulator:
                     break
                 
                 # 1. Generate synthetic RTP packet
+                # (the whole step stays inside the lock so the counters and settings agree)
                 raw_packet = self.generator.generate_packet()
                 self.packet_loss_calc.record_sent()
 
@@ -154,6 +166,8 @@ class VoIPSimulator:
                 
                 sender_ref = self.sender
 
+            # Each delayed packet waits in its own little thread. That way a 300 ms delay on
+            # one packet does not hold up the next one, and the 50 packets/sec pace stays steady.
             # Send impaired packet asynchronously if not dropped so 50Hz frame pacing is maintained
             if impaired_packet is not None and sender_ref is not None:
                 threading.Thread(
@@ -169,11 +183,11 @@ class VoIPSimulator:
         """Dispatches packet over UDP after simulated network delay."""
         send_delay = packet.get("simulated_delay_sec", 0.0)
         if send_delay > 0:
-            time.sleep(send_delay)
+            time.sleep(send_delay)   # this wait IS the network delay (and the jitter)
         try:
             sender.send_packet(packet)
         except Exception:
-            pass
+            pass   # the socket may have been closed by Stop while we were waiting, that is fine
 
     def _receiver_loop(self):
         """Background thread receiving packets from UDP socket and updating metrics."""
@@ -186,6 +200,7 @@ class VoIPSimulator:
             if receiver_ref is None:
                 break
 
+            # Waits up to 0.1 s for a packet; None just means nothing came in that time
             packet = receiver_ref.receive_packet()
             if packet is not None:
                 with self._lock:
@@ -198,6 +213,7 @@ class VoIPSimulator:
     def get_current_metrics(self) -> Dict[str, Any]:
         """Returns compiled snapshot of metrics for frontend WebSocket/REST API."""
         with self._lock:
+            # Collect the latest numbers from each metric engine
             latency_data = self.latency_calc.get_metrics()
             # In-flight packets only count as lost once the stream has ended
             # (sender stopped or simulation stopped) and they have had time to arrive.
@@ -210,6 +226,7 @@ class VoIPSimulator:
             jitter_ms = jitter_data["jitter_ms"]
             loss_pct = loss_data["loss_percentage"]
 
+            # Two ways of scoring the call, depending on whether a jitter buffer is in use
             buf = self.jitter_buffer
             if buf.mode == "off":
                 # No buffer: use measured latency, jitter and network loss directly

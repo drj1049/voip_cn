@@ -1,6 +1,8 @@
 import React from 'react';
 import { Award, Zap } from 'lucide-react';
 
+// The big half-circle gauge showing the MOS score, its rating and the R-factor.
+// The defaults are the "perfect line" values, shown until the first live numbers arrive.
 const MosGauge = ({ mos = 4.5, quality = 'EXCELLENT', rFactor = 93.2 }) => {
   // Determine color class and hue based on MOS
   const getQualityColor = (rating) => {
@@ -15,6 +17,8 @@ const MosGauge = ({ mos = 4.5, quality = 'EXCELLENT', rFactor = 93.2 }) => {
   };
 
   const currentColor = getQualityColor(quality);
+  // Turn the MOS into how full the arc should be: 1.0 = empty, 4.5 = full (that is the 3.5 range).
+  // Math.min/max keep it between 0 and 100 even if a strange value arrives.
   // Calculate percentage fill for gauge (MOS ranges 1.0 to 4.5/5.0)
   const percent = Math.min(100, Math.max(0, ((mos - 1.0) / 3.5) * 100));
 
@@ -37,7 +41,9 @@ const MosGauge = ({ mos = 4.5, quality = 'EXCELLENT', rFactor = 93.2 }) => {
               strokeWidth="8"
               strokeLinecap="round"
             />
-            {/* Active Arc Progress */}
+            {/* Active Arc Progress.
+                125.6 is the length of this half-circle (pi x radius 40). strokeDashoffset hides
+                the part of the line that should be empty, so a smaller offset = a fuller arc. */}
             <path
               d="M 10 50 A 40 40 0 0 1 90 50"
               fill="none"
@@ -52,6 +58,7 @@ const MosGauge = ({ mos = 4.5, quality = 'EXCELLENT', rFactor = 93.2 }) => {
         </div>
 
         <div className="mos-score-large" style={{ color: currentColor }}>
+          {/* toFixed(2) = always show two decimals, like 3.91 */}
           {mos ? mos.toFixed(2) : '1.00'}
         </div>
 

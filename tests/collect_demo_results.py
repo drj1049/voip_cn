@@ -11,6 +11,7 @@ def run_scenarios():
     print("         REAL-TIME VOIP CALL QUALITY ANALYZER — FINAL EMPIRICAL TEST RESULTS")
     print("=" * 95)
 
+    # (name, delay ms, jitter ms, loss %) - the same five presets as the dashboard buttons
     scenarios = [
         ("Good Network", 20.0, 2.0, 0.0),
         ("High Latency", 200.0, 5.0, 0.0),
@@ -22,6 +23,8 @@ def run_scenarios():
     results = []
 
     for name, delay, jitter, loss in scenarios:
+        # A fresh simulator per scenario, on its own port (5012), so runs cannot affect each other
+        # and it does not clash with the live server on 5005
         simulator = VoIPSimulator(target_port=5012)
         simulator.update_config(delay_ms=delay, jitter_ms=jitter, packet_loss_pct=loss)
         simulator.start()
@@ -36,6 +39,7 @@ def run_scenarios():
         metrics = simulator.get_current_metrics()
         simulator.stop()
 
+        # Keep both what we asked for and what was actually measured, side by side
         res_entry = {
             "scenario": name,
             "configured_delay_ms": delay,
@@ -58,7 +62,7 @@ def run_scenarios():
         print(f"  Counters:   Sent={metrics['packets_sent']} | Received={metrics['packets_received']} | Lost={metrics['packets_lost']}")
         print(f"  Quality:    Estimated MOS={metrics['mos']:.2f} | Rating={metrics['quality']} (R-Factor: {metrics['r_factor']:.2f})")
 
-    # Save to JSON file
+    # Save to JSON file (this is where the README results table comes from)
     with open("tests/demo_results.json", "w") as f:
         json.dump(results, f, indent=2)
 

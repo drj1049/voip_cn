@@ -28,10 +28,11 @@ from backend.metrics.jitter_buffer import JitterBuffer
 from backend.metrics.packet_loss import PacketLossCalculator
 from backend.metrics.mos import MOSEstimator
 
+# Same numbers as the live simulator, so audio mode behaves like the same phone call
 SAMPLE_RATE = 8000                      # G.711 telephone audio
 FRAME_SEC = 0.02                        # 20 ms per packet
 FRAME_SAMPLES = int(SAMPLE_RATE * FRAME_SEC)   # 160 samples, same as PacketGenerator
-MAX_SECONDS = 30.0
+MAX_SECONDS = 30.0                      # keeps processing fast and uploads small
 
 # Frame outcomes used in the "frames" string returned to the dashboard
 PLAYED, LOST, LATE = "0", "1", "2"
@@ -39,6 +40,8 @@ PLAYED, LOST, LATE = "0", "1", "2"
 
 def decode_wav(data: bytes) -> np.ndarray:
     """Reads WAV bytes and returns mono 8 kHz 16-bit samples."""
+    # Read the header and raw samples from the uploaded bytes. A bad file raises a plain
+    # ValueError so the API can turn it into a friendly 400 message.
     try:
         with wave.open(io.BytesIO(data), "rb") as wf:
             channels = wf.getnchannels()
@@ -48,6 +51,8 @@ def decode_wav(data: bytes) -> np.ndarray:
     except (wave.Error, EOFError):
         raise ValueError("Not a valid WAV file (PCM WAV expected)")
 
+    # Turn the raw bytes into numbers. 8-bit WAVs are unsigned and centred on 128, the
+    # others are signed, so everything is converted to the same 16-bit-sized scale first.
     if width == 1:
         samples = (np.frombuffer(raw, dtype=np.uint8).astype(np.float64) - 128.0) * 256.0
     elif width == 2:
@@ -57,15 +62,19 @@ def decode_wav(data: bytes) -> np.ndarray:
     else:
         raise ValueError("Only 8, 16 and 32-bit PCM WAV files are supported")
 
+    # Stereo to mono: average the channels (drop a half-finished last frame if there is one)
     if channels > 1:
         usable = (len(samples) // channels) * channels
         samples = samples[:usable].reshape(-1, channels).mean(axis=1)
 
+    # Different sample rate to telephone audio: resample to 8 kHz.
     if rate != SAMPLE_RATE and len(samples) > 0:
         if rate > SAMPLE_RATE:
             # Crude low-pass (moving average) before dropping samples, to limit aliasing
             k = max(1, int(round(rate / SAMPLE_RATE)))
             samples = np.convolve(samples, np.ones(k) / k, mode="same")
+        # Straight-line interpolation: work out where each new sample falls on the old
+        # timeline and read the value from there
         new_len = int(len(samples) * SAMPLE_RATE / rate)
         old_t = np.arange(len(samples)) / rate
         new_t = np.arange(new_len) / SAMPLE_RATE
@@ -76,6 +85,7 @@ def decode_wav(data: bytes) -> np.ndarray:
     if len(samples) < FRAME_SAMPLES:
         raise ValueError("Clip is too short (at least 20 ms needed)")
 
+    # Round and clip so nothing overflows the 16-bit range
     return np.clip(np.round(samples), -32768, 32767).astype(np.int16)
 
 
@@ -96,16 +106,20 @@ def make_demo_clip(seconds: float = 8.0) -> np.ndarray:
     a short rising and falling melody with a soft attack on every note.
     Gaps are easy to hear in it.
     """
+    # Each number is a note frequency in Hz (262 is middle C). Nothing special about this tune,
+    # it just rises and falls so that missing pieces are easy to hear.
     notes = [262, 330, 392, 523, 392, 330, 262, 330, 392, 523, 659, 523, 392, 330, 262, 196]
     note_sec = seconds / len(notes)
     n = int(SAMPLE_RATE * note_sec)
     t = np.arange(n) / SAMPLE_RATE
+    # Fade each note in and out quickly so there are no clicks between notes
     envelope = np.minimum(1.0, t / 0.02) * np.minimum(1.0, (note_sec - t) / 0.05)
     parts = []
     for f in notes:
         tone = np.sin(2 * math.pi * f * t) + 0.3 * np.sin(2 * math.pi * 2 * f * t)
         parts.append(tone * envelope)
     wave_data = np.concatenate(parts)
+    # Scale to 60% of the maximum volume, loud enough to hear but with headroom
     wave_data = wave_data / np.max(np.abs(wave_data)) * 0.6 * 32767
     return np.round(wave_data).astype(np.int16)
 
@@ -145,12 +159,14 @@ def process_audio(samples: np.ndarray,
     Sends the clip through the simulated network and returns metrics, the
     per-frame outcome string, and the damaged audio as WAV bytes.
     """
+    # Cut the clip into 20 ms pieces. The last piece is padded with silence if it is short.
     samples = np.asarray(samples, dtype=np.int16)
     n_frames = int(math.ceil(len(samples) / FRAME_SAMPLES))
     padded = np.zeros(n_frames * FRAME_SAMPLES, dtype=np.int16)
     padded[:len(samples)] = samples
     frames = padded.reshape(n_frames, FRAME_SAMPLES)
 
+    # Same engine and metric classes the live simulator uses, so the maths is identical.
     engine = ImpairmentEngine(delay_ms=delay_ms, jitter_ms=jitter_ms, packet_loss_pct=packet_loss_pct)
     engine.update_config(loss_mode=loss_mode, burst_length=burst_length)
 
@@ -159,6 +175,7 @@ def process_audio(samples: np.ndarray,
     buffer = JitterBuffer(mode=buffer_mode, fixed_ms=buffer_ms)
 
     # 1. Build one packet per frame on a virtual clock (no real waiting) and apply the network
+    # (frame i is "sent" at i x 20 ms; the engine tells us how long it is delayed, or drops it)
     arrived: List[Dict[str, Any]] = []
     for i in range(n_frames):
         send_time = i * FRAME_SEC
@@ -179,6 +196,7 @@ def process_audio(samples: np.ndarray,
     # 2. The receiver sees packets in arrival order (jitter can reorder them)
     arrived.sort(key=lambda p: (p["receive_time"], p["frame_index"]))
 
+    # Start by assuming every frame was lost; each packet that arrives overwrites its own slot
     status = [LOST] * n_frames
     transit_ms: List[float] = []
     for p in arrived:
@@ -197,6 +215,7 @@ def process_audio(samples: np.ndarray,
     score = _score(avg_latency, jitter_val, loss_data["loss_percentage"], burst_ratio, buffer)
 
     # 4. Rebuild the audio: silence wherever the receiver has nothing to play
+    # (a lost frame and a too-late frame both end up as silence, just like on a real phone)
     damaged = frames.copy()
     for i, s in enumerate(status):
         if s != PLAYED:

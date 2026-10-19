@@ -20,8 +20,8 @@ class PacketLossCalculator:
         self._window = deque(maxlen=window_size)
         self.packets_sent: int = 0
         self.packets_received: int = 0
-        self.sequence_gap_lost: int = 0
-        self.max_seq_received: int = -1
+        self.sequence_gap_lost: int = 0     # packets we know are missing because the numbers skipped
+        self.max_seq_received: int = -1     # highest sequence number seen so far (-1 = none yet)
         self._gap_events: int = 0   # number of separate runs of lost packets
 
     def record_sent(self):
@@ -36,16 +36,20 @@ class PacketLossCalculator:
         seq = packet["sequence_number"]
         self.packets_received += 1
 
+        # The first packet has nothing before it to compare with
         if self.max_seq_received == -1:
             self.max_seq_received = seq
             self._window.append(True)
             return
 
+        # How far ahead of the highest packet so far is this one? The % 65536 handles the
+        # 16-bit sequence number wrapping back to 0.
         # Calculate forward difference with 16-bit wraparound (65536)
         diff = (seq - self.max_seq_received) % 65536
 
         if diff < 30000:
             # Packet arrived with sequence > max_seq_received
+            # Example: we had 103 and now 106 arrives. Then 104 and 105 are missing, gap = 2.
             gap = diff - 1
             if gap > 0:
                 self.sequence_gap_lost += gap
@@ -56,6 +60,8 @@ class PacketLossCalculator:
             self.max_seq_received = seq
         else:
             # Reordered / late packet (seq <= max_seq_received)
+            # This packet showed up after we had already written it off as lost (jitter made it
+            # overtake or fall behind), so take it back off the lost count.
             # Reduce gap count if previously counted as lost
             if self.sequence_gap_lost > 0:
                 self.sequence_gap_lost -= 1
@@ -89,6 +95,7 @@ class PacketLossCalculator:
         """
         if not final:
             # Live view: loss over the last window_size packets only
+            # (so the dashboard recovers once the network gets better again)
             if not self._window:
                 return 0.0
             window_lost = sum(1 for arrived in self._window if not arrived)
@@ -130,8 +137,12 @@ class PacketLossCalculator:
         p = lost / total
         if p >= 1.0:
             return 1.0
+        # observed_burst = how many packets go missing in a row, on average, in this run.
+        # expected_random_burst = what that would be if the same loss was scattered randomly.
+        # Their ratio says how clumpy the loss is (1.0 = not clumpy at all).
         observed_burst = lost / runs
         expected_random_burst = 1.0 / (1.0 - p)
+        # Keep it between 1 and 10 so one freak run cannot blow up the MOS formula
         return max(1.0, min(10.0, observed_burst / expected_random_burst))
 
     def get_metrics(self, final: bool = False) -> Dict[str, Any]:

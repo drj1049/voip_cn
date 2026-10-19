@@ -1,3 +1,5 @@
+# Things git should not track: Mac junk, Python caches, installed packages,
+# build output and virtual environments
 .DS_Store
 __pycache__/
 .pytest_cache/

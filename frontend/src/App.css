@@ -1,4 +1,6 @@
 /* Clean Modern Dark CSS for VoIP Call Quality Analyzer */
+/* The theme: every colour and font is a variable here. Change a value once
+   and the whole dashboard follows. Components use these as var(--name). */
 :root {
   --bg-primary: #0f172a;
   --bg-card: #1e293b;
@@ -16,6 +18,8 @@
   --font-mono: 'JetBrains Mono', monospace;
 }
 
+/* Start every element from zero spacing, and make widths include padding and border,
+   which makes layouts much easier to reason about. */
 * {
   box-sizing: border-box;
   margin: 0;
@@ -30,6 +34,7 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* The page wrapper: centred, and never wider than 1400px on big screens */
 .app-container {
   max-width: 1400px;
   margin: 0 auto;
@@ -65,6 +70,7 @@ body {
   margin-top: 0.25rem;
 }
 
+/* The pill in the header that says "Simulation running" or "stopped" */
 .status-badge {
   display: flex;
   align-items: center;
@@ -78,12 +84,14 @@ body {
   border: 1px solid rgba(16, 185, 129, 0.2);
 }
 
+/* Red version of the pill, used when the simulation is stopped or the backend is offline */
 .status-badge.stopped {
   background: rgba(239, 68, 68, 0.1);
   color: var(--accent-red);
   border-color: rgba(239, 68, 68, 0.2);
 }
 
+/* The small glowing dot inside the pill; it takes whatever text colour the pill has */
 .status-dot {
   width: 10px;
   height: 10px;
@@ -92,7 +100,7 @@ body {
   box-shadow: 0 0 8px currentColor;
 }
 
-/* Grid Layouts */
+/* Grid Layouts: controls beside the gauge, four metric cards in a row, two charts side by side */
 .top-section-grid {
   display: grid;
   grid-template-columns: 1.2fr 1fr;
@@ -115,6 +123,7 @@ body {
 }
 
 /* Common Card Base */
+/* Every box on the page (controls, charts, audio panel) is built on this card style */
 .card-panel {
   background: var(--bg-card);
   border: 1px solid var(--border-color);
@@ -298,14 +307,14 @@ body {
   margin-bottom: 1rem;
 }
 
-/* MOS Quality Categories */
+/* MOS Quality Categories: one colour per rating, so green = good and red = bad at a glance */
 .quality-EXCELLENT { color: #10b981; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); }
 .quality-GOOD { color: #06b6d4; background: rgba(6, 182, 212, 0.15); border: 1px solid rgba(6, 182, 212, 0.3); }
 .quality-FAIR { color: #f59e0b; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.3); }
 .quality-POOR { color: #f97316; background: rgba(249, 115, 22, 0.15); border: 1px solid rgba(249, 115, 22, 0.3); }
 .quality-BAD { color: #ef4444; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); }
 
-/* Chart Container */
+/* Chart Container: charts need a fixed height or they collapse to nothing */
 .chart-container {
   width: 100%;
   height: 220px;
@@ -330,6 +339,7 @@ body {
   border-bottom: none;
 }
 
+/* Smaller screens: stack things instead of putting them side by side */
 @media (max-width: 1024px) {
   .top-section-grid { grid-template-columns: 1fr; }
   .metric-cards-grid { grid-template-columns: repeat(2, 1fr); }
@@ -369,6 +379,7 @@ body {
   color: var(--accent-blue);
 }
 
+/* The little Off / Fixed / Adaptive style toggle buttons in the Advanced section */
 .segmented {
   display: inline-flex;
   background: #0f172a;
@@ -446,7 +457,7 @@ body {
   padding: 0.25rem 0.9rem 0.9rem;
 }
 
-/* Audio mode */
+/* Audio mode: the upload, players and the packet strip at the bottom of the dashboard */
 .audio-lab {
   margin-bottom: 1.5rem;
 }
@@ -516,6 +527,7 @@ body {
   margin-top: 0.75rem;
 }
 
+/* Results area: score on the left, the two audio players on the right, packet strip underneath */
 .audio-results {
   display: grid;
   grid-template-columns: 200px 1fr;
@@ -574,6 +586,7 @@ body {
   grid-column: 1 / -1;
 }
 
+/* The coloured strip is a canvas drawn in AudioLab.jsx; this only sizes and rounds it */
 .audio-strip {
   width: 100%;
   height: 22px;
@@ -603,6 +616,7 @@ body {
   color: var(--text-muted);
 }
 
+/* On narrow screens put everything in the audio panel in a single column */
 @media (max-width: 900px) {
   .audio-results { grid-template-columns: 1fr; }
   .audio-players { grid-template-columns: 1fr; }

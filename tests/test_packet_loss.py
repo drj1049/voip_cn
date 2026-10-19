@@ -10,8 +10,9 @@ def test_packet_loss_detection():
     calc = PacketLossCalculator()
 
     for seq in range(101, 106):
-        calc.record_sent()
+        calc.record_sent()     # tell the calculator 5 packets were sent
 
+    # ...but only 4 of them show up (104 never arrives)
     for seq in (101, 102, 103, 105):
         calc.add_received_packet({"sequence_number": seq})
 
@@ -31,6 +32,7 @@ def test_in_flight_packets_not_counted_as_lost():
         calc.add_received_packet({"sequence_number": seq})
 
     live = calc.get_metrics()
+    # While the call is live, packets that have not arrived yet are not counted as lost
     assert live["packets_lost"] == 0
     assert live["loss_percentage"] == 0.0
 
@@ -56,6 +58,7 @@ def test_live_loss_recovers_with_rolling_window():
         calc.record_sent()
         calc.add_received_packet({"sequence_number": seq})
 
+    # The live view only looks at the last 250 packets (about 5 seconds)
     # Old losses have scrolled out of the window, so live loss is back to 0
     assert calc.get_metrics()["loss_percentage"] == 0.0
     # Full-run total still remembers them

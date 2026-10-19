@@ -2,6 +2,8 @@ import React from 'react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import { Activity } from 'lucide-react';
 
+// Line chart of latency over time. "data" is the rolling list of points Dashboard.jsx keeps
+// (about the last 45 readings). The chart redraws whenever a new point is added.
 const LatencyChart = ({ data = [] }) => {
   return (
     <div className="card-panel">
@@ -19,6 +21,7 @@ const LatencyChart = ({ data = [] }) => {
               contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', borderRadius: '8px', color: '#f8fafc' }}
               labelStyle={{ color: '#94a3b8' }}
             />
+            {/* isAnimationActive off: the chart updates 4 times a second, animating would look jumpy */}
             <Line
               type="monotone"
               dataKey="latency"

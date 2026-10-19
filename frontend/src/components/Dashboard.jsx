@@ -21,7 +21,10 @@ const WS_URL =
     ? 'ws://localhost:8000/ws'
     : `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}/ws`);
 
+// The main screen. It holds all the live data in state, listens to the backend over a WebSocket,
+// and hands the numbers down to the smaller components (gauge, cards, charts, audio panel).
 const Dashboard = () => {
+  // Latest numbers from the backend. These starting values are shown until the first update arrives.
   const [metrics, setMetrics] = useState({
     timestamp: Date.now(),
     status: 'STOPPED',
@@ -39,6 +42,7 @@ const Dashboard = () => {
     quality: 'EXCELLENT'
   });
 
+  // The slider settings currently chosen by the user
   const [config, setConfig] = useState({
     delay_ms: 20,
     jitter_ms: 2,
@@ -49,10 +53,11 @@ const Dashboard = () => {
     buffer_ms: 40
   });
 
-  const [history, setHistory] = useState([]);
-  const [connected, setConnected] = useState(false);
-  const wsRef = useRef(null);
+  const [history, setHistory] = useState([]);       // recent readings, used by the graphs
+  const [connected, setConnected] = useState(false); // is the WebSocket to the backend open?
+  const wsRef = useRef(null);                        // keeps the socket so we can close it later
 
+  // Runs once when the page opens: load the current settings, then open the live data stream.
   // Initialize WebSocket telemetry stream & fetch current config
   useEffect(() => {
     // Fetch initial config
@@ -64,6 +69,7 @@ const Dashboard = () => {
       .catch(err => console.log('Config fetch note:', err.message));
 
     // Connect WebSocket
+    // "disposed" is set when the page closes, so we stop trying to reconnect after that
     let disposed = false;
     let reconnectTimer = null;
 
@@ -109,12 +115,13 @@ const Dashboard = () => {
       };
 
       socket.onerror = (err) => {
-        socket.close();
+        socket.close();   // closing triggers onclose above, which schedules a reconnect
       };
     };
 
     connectWs();
 
+    // Cleanup when leaving the page: stop reconnecting and close the socket
     return () => {
       disposed = true;
       if (reconnectTimer) clearTimeout(reconnectTimer);
@@ -123,6 +130,7 @@ const Dashboard = () => {
   }, []);
 
   // Update Config handler
+  // Updates the screen straight away, then tells the backend, so sliders feel instant.
   const handleConfigChange = async (newConfig) => {
     setConfig(newConfig);
     try {
@@ -167,11 +175,14 @@ const Dashboard = () => {
   const isRunning = metrics.status === 'RUNNING';
 
   // Display helpers
+  // fmt: show a number with one decimal (and 0.0 for missing values)
   const fmt = (v) => (v ? Number(v).toFixed(1) : '0.0');
+  // With a jitter buffer on, the cards show buffer details instead of the plain RFC 3550 label
   const bufferOn = metrics.buffer_mode && metrics.buffer_mode !== 'off';
   const qualityLabel = metrics.quality
     ? metrics.quality.charAt(0) + metrics.quality.slice(1).toLowerCase()
     : '';
+  // Colour for each rating, the same ones used by the gauge and the CSS badges
   const QUALITY_COLORS = {
     EXCELLENT: '#10b981',
     GOOD: '#06b6d4',
@@ -183,6 +194,8 @@ const Dashboard = () => {
 
   return (
     <div className="app-container">
+      {/* Page layout from top to bottom: header, controls + gauge, four metric cards,
+          two charts, packet loss card, audio mode, footer */}
       {/* Header */}
       <header className="app-header">
         <div className="header-title-box">

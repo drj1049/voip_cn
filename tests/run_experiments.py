@@ -18,6 +18,7 @@ import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
 
+# Lets this script import the backend package when run as "python tests/run_experiments.py"
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from backend.simulation.simulator import VoIPSimulator  # noqa: E402
 
@@ -28,6 +29,7 @@ DRAIN_SECONDS = 0.7
 WORKERS = 6                # simulations run side by side, each on its own port
 
 
+# Runs one simulation for the given time and returns the final metrics.
 def run_point(port, seconds, **cfg):
     sim = VoIPSimulator(target_port=port)
     sim.update_config(**cfg)
@@ -40,6 +42,8 @@ def run_point(port, seconds, **cfg):
     return m
 
 
+# Experiment A: for each loss level, run once with random loss and once with bursty loss,
+# so the two can be compared at the same average loss.
 def experiment_burst(port):
     jobs = []
     for loss in [2, 4, 6, 8, 10, 15]:
@@ -47,6 +51,7 @@ def experiment_burst(port):
             jobs.append((port, loss, mode))
             port += 1
 
+    # One unit of work for the thread pool (each job has its own port, so they can run together)
     def work(job):
         prt, loss, mode = job
         return job, run_point(prt, BURST_RUN_SECONDS, delay_ms=50.0, jitter_ms=5.0,
@@ -65,6 +70,8 @@ def experiment_burst(port):
     return rows, port
 
 
+# Experiment B: how does the jitter buffer size change the result? Try it off, at several
+# fixed depths and adaptive, under two jitter levels.
 def experiment_buffer(port):
     settings = [("off", 0)] + [("fixed", d) for d in (20, 40, 60, 80, 100, 150)] + [("adaptive", 0)]
     jobs = []
@@ -95,7 +102,7 @@ def experiment_buffer(port):
 
 def main():
     os.makedirs(OUT_DIR, exist_ok=True)
-    port = 5300
+    port = 5300   # starting port for this script (the sweep script uses 5100)
     burst_rows, port = experiment_burst(port)
     buffer_rows, port = experiment_buffer(port)
 
@@ -104,6 +111,7 @@ def main():
 
     with open(os.path.join(OUT_DIR, "experiments.csv"), "w", newline="") as f:
         w = csv.writer(f)
+        # The two experiments have different columns, so use every column name that appears
         keys = sorted({k for r in burst_rows + buffer_rows for k in r})
         w.writerow(keys)
         for r in burst_rows + buffer_rows:
@@ -139,7 +147,7 @@ def make_graphs(burst_rows, buffer_rows):
     fig.savefig(os.path.join(OUT_DIR, "burst_vs_random.png"), dpi=150)
     plt.close(fig)
 
-    # B) jitter buffer trade-off
+    # B) jitter buffer trade-off: three small graphs side by side (score, late packets, delay)
     labels = []
     for r in buffer_rows:
         if r["buffer"] not in labels:

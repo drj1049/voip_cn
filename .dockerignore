@@ -1,3 +1,5 @@
+# Things Docker should NOT copy into the image: they are big, rebuilt inside the image,
+# or just not needed to run the app
 venv/
 .venv/
 .git/

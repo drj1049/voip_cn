@@ -2,6 +2,7 @@ import React from 'react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import { ShieldAlert } from 'lucide-react';
 
+// Packet loss card: a loss % graph on the left, and the sent / received / lost counts on the right.
 const PacketLossCard = ({ data = [], packetsSent = 0, packetsReceived = 0, packetsLost = 0, lossPct = 0 }) => {
   return (
     <div className="card-panel">
@@ -17,6 +18,7 @@ const PacketLossCard = ({ data = [], packetsSent = 0, packetsReceived = 0, packe
             <AreaChart data={data}>
               <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
               <XAxis dataKey="time" stroke="#94a3b8" fontSize={11} tickLine={false} />
+              {/* 30 is the highest loss the sliders allow, so the axis is fixed to 0 to 30 */}
               <YAxis stroke="#94a3b8" fontSize={11} domain={[0, 30]} tickLine={false} />
               <Tooltip
                 contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', borderRadius: '8px', color: '#f8fafc' }}
@@ -51,6 +53,7 @@ const PacketLossCard = ({ data = [], packetsSent = 0, packetsReceived = 0, packe
           </div>
           <div className="pkt-stat-row" style={{ paddingTop: '0.5rem' }}>
             <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Packet Loss Rate</span>
+            {/* Goes red above 5% loss, where call quality starts to suffer clearly */}
             <strong style={{ fontFamily: 'var(--font-mono)', fontSize: '1.1rem', color: lossPct > 5 ? 'var(--accent-red)' : 'var(--accent-emerald)' }}>
               {lossPct ? lossPct.toFixed(1) : '0.0'}%
             </strong>

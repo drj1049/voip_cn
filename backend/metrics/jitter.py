@@ -25,17 +25,24 @@ class RFC3550JitterCalculator:
         send_time = packet["send_time"]
         receive_time = packet["receive_time"]
 
+        # We need two packets to compare, so the very first one only gets remembered
         if self.last_send_time is not None and self.last_receive_time is not None:
+            # Transit time = how long this packet took to arrive.
+            # D is how much that changed since the previous packet. If every packet takes
+            # exactly the same time, D is 0 and there is no jitter.
             # Transit time difference D(i-1, i) = (R_i - S_i) - (R_{i-1} - S_{i-1})
             current_transit = receive_time - send_time
             previous_transit = self.last_receive_time - self.last_send_time
 
-            d = abs(current_transit - previous_transit)
+            d = abs(current_transit - previous_transit)   # we only care about the size of the change
 
+            # Move the jitter estimate 1/16th of the way towards the newest |D|.
+            # The /16 comes from RFC 3550. It smooths things so one odd packet does not
+            # make the number jump around.
             # Exponentially smoothed estimate: J = J + (|D| - J) / 16.0
             self.jitter_sec += (d - self.jitter_sec) / 16.0
 
-        # Save previous packet timing
+        # Remember this packet so the next one has something to compare against
         self.last_send_time = send_time
         self.last_receive_time = receive_time
 

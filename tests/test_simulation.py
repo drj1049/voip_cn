@@ -6,13 +6,14 @@ import pytest
 from backend.simulation.simulator import VoIPSimulator
 
 
+# Starts a real (short) UDP simulation and checks that packets are sent and received.
 def test_simulator_lifecycle():
     # Use a dedicated port so the test never clashes with a running server on 5005
     sim = VoIPSimulator(target_port=5099)
     sim.update_config(delay_ms=10.0, jitter_ms=0.0, packet_loss_pct=0.0)
 
     assert sim.start() is True
-    time.sleep(0.5)
+    time.sleep(0.5)   # let about 25 packets flow
 
     running = sim.get_current_metrics()
     assert running["status"] == "RUNNING"
@@ -25,6 +26,7 @@ def test_simulator_lifecycle():
     assert stopped["status"] == "STOPPED"
 
 
+# Only checks that settings are stored and reported back (nothing is started here).
 def test_simulator_applies_burst_and_buffer_settings():
     sim = VoIPSimulator(target_port=5098)
     sim.update_config(packet_loss_pct=5.0, loss_mode="burst", burst_length=6.0,

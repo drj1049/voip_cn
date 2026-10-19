@@ -1,8 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Headphones, Upload } from 'lucide-react';
 
+// Telephone audio is 8000 samples per second, so every clip is converted to that
 const TARGET_RATE = 8000;
-const MAX_SECONDS = 30;
+const MAX_SECONDS = 30;   // longer clips are cut (the backend also enforces this)
+// Same rating colours as the gauge and the metric cards
 const QUALITY_COLORS = {
   EXCELLENT: '#10b981',
   GOOD: '#06b6d4',
@@ -10,19 +12,25 @@ const QUALITY_COLORS = {
   POOR: '#f97316',
   BAD: '#ef4444'
 };
+// Strip colours: '0' = played fine, '1' = lost in the network, '2' = arrived too late
+// (the backend sends one of these characters per 20 ms packet)
 const FRAME_COLORS = { '0': '#10b981', '1': '#ef4444', '2': '#f59e0b' };
 
 // Decode any audio file the browser understands, then turn it into a small
 // mono 8 kHz 16-bit WAV (telephone quality) before sending it to the backend.
 async function fileToWav(file) {
+  // 1. Read the raw bytes of the chosen file
   const bytes = await file.arrayBuffer();
   const Ctx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+  // An OfflineAudioContext is the browser's built-in audio decoder. It understands mp3, m4a,
+  // wav, ogg and more, so the user can upload almost anything.
   let ctx;
   try {
     ctx = new Ctx(1, TARGET_RATE, TARGET_RATE);
   } catch (e) {
     ctx = new Ctx(1, 44100, 44100); // some browsers refuse 8 kHz contexts
   }
+  // 2. Decode it into raw audio numbers
   const decoded = await ctx.decodeAudioData(bytes);
 
   // Mix down to mono and keep the first MAX_SECONDS only
@@ -35,6 +43,8 @@ async function fileToWav(file) {
     for (let i = 0; i < length; i++) mono[i] += ch[i] / decoded.numberOfChannels;
   }
 
+  // 3. Shrink to 8 kHz. For each output sample, average the group of input samples it covers
+  // (averaging also acts as a simple filter that avoids harsh aliasing noise).
   // Resample to 8 kHz by averaging each output sample's input window
   let samples = mono;
   if (rate !== TARGET_RATE) {
@@ -50,6 +60,7 @@ async function fileToWav(file) {
     }
   }
 
+  // 4. Write a standard 16-bit WAV file: a 44 byte header (format details) followed by the samples.
   // Write a 16-bit PCM WAV
   const buffer = new ArrayBuffer(44 + samples.length * 2);
   const view = new DataView(buffer);
@@ -69,6 +80,8 @@ async function fileToWav(file) {
   view.setUint16(34, 16, true);
   writeStr(36, 'data');
   view.setUint32(40, samples.length * 2, true);
+  // Browser audio is floating point between -1 and 1; WAV wants whole numbers, so scale it up.
+  // Negative and positive sides use slightly different multipliers to cover the full 16-bit range.
   for (let i = 0; i < samples.length; i++) {
     const v = Math.max(-1, Math.min(1, samples[i]));
     view.setInt16(44 + i * 2, v < 0 ? v * 0x8000 : v * 0x7fff, true);
@@ -76,14 +89,17 @@ async function fileToWav(file) {
   return { buffer, truncated };
 }
 
+// The "Audio mode" panel. It reuses the network settings from the sliders (config), uploads a
+// clip (or uses the built-in demo melody), asks the backend to run it through those conditions,
+// and shows the score, two audio players and a strip showing what happened to each packet.
 const AudioLab = ({ config, apiBase }) => {
-  const [file, setFile] = useState(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  const [note, setNote] = useState('');
-  const [result, setResult] = useState(null);
-  const canvasRef = useRef(null);
-  const inputRef = useRef(null);
+  const [file, setFile] = useState(null);       // the chosen audio file (null = use the demo clip)
+  const [busy, setBusy] = useState(false);       // true while the backend is working
+  const [error, setError] = useState('');        // message shown in red if something fails
+  const [note, setNote] = useState('');          // friendly heads-up, like "clip was cut to 30 seconds"
+  const [result, setResult] = useState(null);    // the last answer from the backend
+  const canvasRef = useRef(null);                // the packet strip drawing area
+  const inputRef = useRef(null);                 // the hidden file picker, opened by our own button
 
   // Draw one coloured slice per 20 ms packet: played, lost or discarded as late
   useEffect(() => {
@@ -101,11 +117,13 @@ const AudioLab = ({ config, apiBase }) => {
     }
   }, [result]);
 
+  // Runs when the user presses "Apply network conditions"
   const run = async () => {
     setBusy(true);
     setError('');
     setNote('');
     try {
+      // The network settings go in the URL; the audio itself goes in the request body
       const mode = config.buffer_mode || 'off';
       const params = new URLSearchParams({
         use_demo: file ? 'false' : 'true',
@@ -118,6 +136,7 @@ const AudioLab = ({ config, apiBase }) => {
         buffer_ms: config.buffer_ms ?? 40
       });
 
+      // No file chosen = no body, and use_demo=true above tells the backend to use its own clip
       let body;
       let headers = {};
       if (file) {
@@ -132,6 +151,7 @@ const AudioLab = ({ config, apiBase }) => {
         headers,
         body
       });
+      // On a failure the backend explains why in a "detail" field; show that message if present
       if (!res.ok) {
         let detail = `Request failed (${res.status})`;
         try {
@@ -144,11 +164,12 @@ const AudioLab = ({ config, apiBase }) => {
     } catch (err) {
       setError(err.message || 'Could not process the audio');
     } finally {
-      setBusy(false);
+      setBusy(false);   // always re-enable the button, whether it worked or not
     }
   };
 
   const m = result ? result.metrics : null;
+  // With the jitter buffer off, jitter cannot be heard (see the hint shown below)
   const bufferOff = (config.buffer_mode || 'off') === 'off';
   const color = m ? QUALITY_COLORS[m.quality] || 'var(--accent-emerald)' : 'inherit';
 
@@ -201,6 +222,7 @@ const AudioLab = ({ config, apiBase }) => {
         </button>
       </div>
 
+      {/* Tell the user why jitter will sound like nothing when no buffer is on */}
       {bufferOff && Number(config.jitter_ms) > 0 && (
         <p className="audio-hint">
           Jitter buffer is off, so jitter will not be audible. Turn it on under Advanced in the
@@ -210,6 +232,7 @@ const AudioLab = ({ config, apiBase }) => {
       {error && <p className="audio-error">{error}</p>}
       {note && <p className="audio-hint">{note}</p>}
 
+      {/* Everything below only appears after a successful run */}
       {result && (
         <div className="audio-results">
           <div className="audio-score">
@@ -231,6 +254,7 @@ const AudioLab = ({ config, apiBase }) => {
           <div className="audio-players">
             <div className="audio-player">
               <label>Original</label>
+              {/* The backend sends the audio as base64 text; a data: URL lets the player use it directly */}
               <audio controls src={`data:audio/wav;base64,${result.original_wav}`} />
             </div>
             <div className="audio-player">

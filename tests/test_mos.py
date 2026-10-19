@@ -4,6 +4,8 @@ Unit tests for ITU-T G.107 MOS Estimation Engine
 import pytest
 from backend.metrics.mos import MOSEstimator
 
+# Three checks on the scoring: a clean line should score high, a terrible one should score
+# low, and the rating names should switch at the right MOS values.
 def test_mos_perfect_conditions():
     # Delay 10ms, Jitter 0ms, Loss 0% -> Expected MOS ~ 4.4 - 4.5 EXCELLENT
     metrics = MOSEstimator.get_metrics(latency_ms=10.0, jitter_ms=0.0, packet_loss_pct=0.0)

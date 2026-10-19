@@ -21,14 +21,17 @@ class ImpairmentEngine:
         # "burst" drops packets in clumps (two-state Gilbert-Elliott model).
         self.loss_mode: str = "random"
         self.burst_length: float = 5.0   # average number of packets lost in a row
+        # Only used by burst mode: are we currently inside a run of lost packets?
         self._in_burst: bool = False
 
     def update_config(self, delay_ms: Optional[float] = None, jitter_ms: Optional[float] = None, packet_loss_pct: Optional[float] = None,
                       loss_mode: Optional[str] = None, burst_length: Optional[float] = None):
         """Dynamically updates network impairment parameters during live runtime."""
+        # Every setting is optional (None = leave it alone) and clamped to a sane range,
+        # so a bad value from the API cannot break the simulation.
         if loss_mode in ("random", "burst"):
             self.loss_mode = loss_mode
-            self._in_burst = False
+            self._in_burst = False   # start fresh when the pattern changes
         if burst_length is not None:
             self.burst_length = max(1.0, min(20.0, float(burst_length)))
         if delay_ms is not None:
@@ -53,14 +56,19 @@ class ImpairmentEngine:
                 entering the Bad state is chosen so that the long-run loss rate
                 still equals packet_loss_pct.
         """
-        p = self.packet_loss_pct / 100.0
+        p = self.packet_loss_pct / 100.0   # percent -> a chance between 0 and 1
         if p <= 0.0:
             self._in_burst = False
             return False
 
+        # Random mode: roll a number from 0 to 100. If it lands under the loss percentage,
+        # this packet is dropped. At 5% loss, about 5 of every 100 rolls will drop.
         if self.loss_mode != "burst":
             return random.uniform(0.0, 100.0) < self.packet_loss_pct
 
+        # Burst mode: two states, "good" (packets get through) and "bad" (everything is lost).
+        # Each packet has a small chance to flip the state. "leave" makes bursts last about
+        # burst_length packets, and "enter" is set so the overall loss still matches the slider.
         leave = 1.0 / max(1.0, self.burst_length)
         enter = 1.0 if p >= 1.0 else min(1.0, p * leave / (1.0 - p))
         if self._in_burst:
@@ -79,6 +87,7 @@ class ImpairmentEngine:
             - Modified packet dict with added calculated impairment delay and transmit schedule
         """
         # 1. Packet Loss Simulation
+        # Decide loss first: a lost packet never needs a delay
         if self._should_drop():
             # Packet lost in simulated network channel
             return None
@@ -98,6 +107,9 @@ class ImpairmentEngine:
 
         total_delay_sec = max(0.0, base_delay_sec + jitter_offset_sec)
 
+        # Work on a copy so the original packet is not changed. The sender will wait
+        # simulated_delay_sec before putting the packet on the wire, which is how a slow
+        # network is imitated.
         # Store impairment execution timing in packet metadata
         packet_copy = dict(packet)
         packet_copy["simulated_delay_sec"] = total_delay_sec
