@@ -7,6 +7,7 @@ import MetricCard from './MetricCard';
 import LatencyChart from './LatencyChart';
 import JitterChart from './JitterChart';
 import PacketLossCard from './PacketLossCard';
+import AudioLab from './AudioLab';
 
 // When the backend serves this page (production), use the same address.
 // When running "npm run dev" (port 3000), talk to the backend on port 8000.
@@ -277,6 +278,9 @@ const Dashboard = () => {
         packetsLost={metrics.packets_lost}
         lossPct={metrics.packet_loss}
       />
+
+      {/* Audio mode: run a real clip through the same network conditions */}
+      <AudioLab config={config} apiBase={API_BASE} />
 
       <footer className="app-footer">
         Synthetic RTP-style traffic over local UDP. Jitter follows RFC 3550 and quality

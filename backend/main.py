@@ -2,14 +2,17 @@
 FastAPI Main Server Application for Real-Time VoIP Call Quality Analyzer
 """
 import asyncio
+import base64
 import os
 from typing import Optional
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
+from starlette.concurrency import run_in_threadpool
 
+from backend.audio.processor import decode_wav, make_demo_clip, process_audio
 from backend.simulation.simulator import VoIPSimulator
 from backend.websocket_manager import websocket_manager
 
@@ -120,6 +123,54 @@ def update_config(req: ImpairmentConfigRequest):
         "message": "Config updated successfully",
         "current_config": simulator.get_config()
     }
+
+MAX_AUDIO_UPLOAD_BYTES = 2 * 1024 * 1024   # a 30 second 8 kHz clip is under 0.5 MB
+
+@app.post("/audio/process")
+async def process_audio_clip(
+    request: Request,
+    use_demo: bool = Query(False, description="Use the built-in demo clip instead of an upload"),
+    delay_ms: float = Query(20.0, ge=0.0, le=500.0),
+    jitter_ms: float = Query(2.0, ge=0.0, le=100.0),
+    packet_loss_pct: float = Query(0.0, ge=0.0, le=30.0),
+    loss_mode: str = Query("random"),
+    burst_length: float = Query(5.0, ge=1.0, le=20.0),
+    buffer_mode: str = Query("fixed"),
+    buffer_ms: float = Query(40.0, ge=0.0, le=300.0),
+):
+    """
+    Audio mode. The request body is a WAV file (or empty with use_demo=true).
+    The clip is cut into 20 ms packets, sent through the simulated network with
+    the given settings, and rebuilt. Returns the metrics plus the original and
+    damaged audio as base64 WAV so the dashboard can play both.
+    """
+    if loss_mode not in ("random", "burst"):
+        raise HTTPException(status_code=400, detail="loss_mode must be random or burst")
+    if buffer_mode not in ("off", "fixed", "adaptive"):
+        raise HTTPException(status_code=400, detail="buffer_mode must be off, fixed or adaptive")
+
+    if use_demo:
+        samples = make_demo_clip()
+    else:
+        body = await request.body()
+        if not body:
+            raise HTTPException(status_code=400, detail="No audio received")
+        if len(body) > MAX_AUDIO_UPLOAD_BYTES:
+            raise HTTPException(status_code=413, detail="Audio file is too large (2 MB maximum)")
+        try:
+            samples = decode_wav(body)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+
+    result = await run_in_threadpool(
+        process_audio, samples,
+        delay_ms=delay_ms, jitter_ms=jitter_ms, packet_loss_pct=packet_loss_pct,
+        loss_mode=loss_mode, burst_length=burst_length,
+        buffer_mode=buffer_mode, buffer_ms=buffer_ms,
+    )
+    result["original_wav"] = base64.b64encode(result["original_wav"]).decode("ascii")
+    result["damaged_wav"] = base64.b64encode(result["damaged_wav"]).decode("ascii")
+    return result
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):

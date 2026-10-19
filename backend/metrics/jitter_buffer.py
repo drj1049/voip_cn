@@ -27,12 +27,18 @@ class JitterBuffer:
     ADAPTIVE_FACTOR = 5.0
     ADAPTIVE_MIN_MS = 20.0
     ADAPTIVE_MAX_MS = 200.0
+    # The "fastest transit" baseline is the minimum over the most recent packets only
+    # (about 3 seconds at 50 packets/sec). An all-time minimum would never recover when
+    # the network delay rises, and every packet would be judged late against the old,
+    # faster baseline.
+    BASELINE_WINDOW = 150
 
     def __init__(self, mode: str = "off", fixed_ms: float = 40.0, window_size: int = 250):
         self.mode: str = mode if mode in self.MODES else "off"
         self.fixed_ms: float = float(fixed_ms)
         self.window_size: int = window_size
         self._window = deque(maxlen=window_size)   # True = played on time, False = late
+        self._transits = deque(maxlen=self.BASELINE_WINDOW)   # recent transit times (ms)
         self.min_transit_ms: Optional[float] = None
         self.current_ms: float = self.fixed_ms if self.mode == "fixed" else 0.0
         self.on_time_count: int = 0
@@ -59,8 +65,8 @@ class JitterBuffer:
             return True
 
         transit_ms = max(0.0, (packet["receive_time"] - packet["send_time"]) * 1000.0)
-        if self.min_transit_ms is None or transit_ms < self.min_transit_ms:
-            self.min_transit_ms = transit_ms
+        self._transits.append(transit_ms)
+        self.min_transit_ms = min(self._transits)
 
         if self.mode == "fixed":
             self.current_ms = self.fixed_ms
@@ -93,6 +99,7 @@ class JitterBuffer:
 
     def reset(self):
         self._window.clear()
+        self._transits.clear()
         self.min_transit_ms = None
         self.on_time_count = 0
         self.late_count = 0

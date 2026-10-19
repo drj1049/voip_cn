@@ -51,3 +51,16 @@ def test_switching_mode_resets_statistics():
     assert buf.late_count == 1
     buf.configure(mode="adaptive")
     assert buf.late_count == 0 and buf.mode == "adaptive"
+
+
+def test_baseline_recovers_after_the_delay_increases():
+    # The delay jumps from 20 ms to 200 ms. Packets look late for a moment, but once the
+    # old fast packets leave the recent window the buffer judges them fairly again.
+    buf = JitterBuffer(mode="fixed", fixed_ms=60.0)
+    for _ in range(50):
+        buf.process(pkt(20))
+    assert buf.process(pkt(200)) is False            # still compared with the old baseline
+    for _ in range(JitterBuffer.BASELINE_WINDOW):
+        buf.process(pkt(200))
+    assert buf.process(pkt(200)) is True
+    assert buf.min_transit_ms == 200.0
