@@ -69,6 +69,24 @@ Scroll to the Audio mode panel at the bottom of the dashboard.
 
 The endpoint behind it is `POST /audio/process`. The body is a WAV file (or empty with `use_demo=true`) and the network settings go in the query string.
 
+## Real call replay
+
+The live dashboard normally makes its own synthetic packets. Real call replay instead reads the packets of a REAL call that was recorded with Wireshark or tcpdump, and runs them through the same jitter, loss and MOS code.
+
+**How to record a call.** Start Wireshark on the network you use, make a VoIP or WebRTC call (Meet, WhatsApp, Zoom and similar all send RTP over UDP), stop the capture after a minute or two, and save it as `.pcapng` or `.pcap`. Filtering the display to `rtp` before using File > Export Specified Packets keeps the file small (uploads are limited to 40 MB). Wireshark's Telephony > RTP > RTP Streams window shows the streams it finds, which is a good way to check your recording has audio in it.
+
+**How to use it.** Put the file in the `captures/` folder, or press "Upload capture" in the dashboard. Pick the file, press "Replay call", and the gauge, cards and charts show the recorded call. If a capture holds several RTP streams (for example video and audio), the voice stream is chosen automatically and you can pick another one.
+
+**What is real and what is assumed.**
+- Jitter is RFC 3550 jitter computed from the real arrival times and the RTP timestamps. It is fully real.
+- Packet loss and burst ratio come from gaps in the real sequence numbers. Duplicates are removed and reordered packets are handled.
+- One-way delay cannot be measured from a single capture, because the sender's clock and the capture clock are different clocks. The fastest packet is assumed to take the "Assumed base delay" (40 ms by default) and every other packet gets that plus the extra delay it really had. The variation is real, the starting point is an assumption you can change.
+- The sliders now add EXTRA delay, jitter and loss on top of the recording. Leave them at zero to see the call exactly as it was.
+
+**Shrinking a big recording.** A Wireshark capture also holds everything else your computer sent. To keep only the call, run `python -m backend.replay.trim_capture recording.pcapng voice_only.pcap` from the project folder. It keeps just the voice stream (use `--ssrc 0x...` to pick another one), blanks the hardware addresses, and the replay gives exactly the same numbers from the small file.
+
+**Limits.** A long call can show a small drift, because the two ends' clocks run at slightly different speeds. Fragmented IP packets and non-RTP audio formats are skipped. The replay is of a recording, not a live call. `captures/SYNTHETIC_example_not_a_real_call.pcap` is a file made by code to try the feature, it is NOT a real call.
+
 ## Reading the live gauge
 
 When the jitter buffer is on, it judges every packet against the fastest packet from roughly the last 3 seconds. After you change the delay while the simulation is running, the gauge can look wrong for a few seconds until that window catches up. Pressing Reset clears it straight away.
@@ -110,7 +128,9 @@ backend/
   simulation/              packet_generator, impairment, udp_sender, udp_receiver, simulator
   metrics/                 latency, jitter, packet_loss, jitter_buffer, mos
   audio/                   processor: clip to packets, through the network, back to audio
-frontend/src/components/   Dashboard, ControlPanel, MetricCard, MosGauge, charts, AudioLab
+  replay/                  pcap_reader (reads Wireshark captures), replayer (real call through the same metrics), trim_capture
+frontend/src/components/   Dashboard, ControlPanel, ReplayPanel, MetricCard, MosGauge, charts, AudioLab
+captures/                  capture files for real call replay
 tests/                     unit and integration tests, scenario collector, sweep and experiment scripts
 docs/                      architecture, methodology, test cases, sweep graphs
 ```

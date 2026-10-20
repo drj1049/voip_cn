@@ -19,7 +19,8 @@ const ControlPanel = ({
   isRunning,
   onStart,
   onStop,
-  onReset
+  onReset,
+  replayMode = false
 }) => {
   // Change one setting and keep all the others as they were ({ ...config } copies the old ones)
   const setField = (field, value) => {
@@ -103,7 +104,7 @@ const ControlPanel = ({
   return (
     <div className="card-panel">
       <div className="card-title">
-        <span>Network conditions</span>
+        <span>{replayMode ? 'Extra impairment on top of the real call' : 'Network conditions'}</span>
         <Sliders size={16} color="var(--accent-blue)" />
       </div>
 
@@ -177,7 +178,7 @@ const ControlPanel = ({
         {/* One button that switches between Start and Stop depending on the current state */}
         {!isRunning ? (
           <button className="btn btn-primary" onClick={onStart}>
-            <Play size={16} /> Start
+            <Play size={16} /> {replayMode ? 'Replay again' : 'Start'}
           </button>
         ) : (
           <button className="btn btn-danger" onClick={onStop}>

@@ -8,6 +8,7 @@ import LatencyChart from './LatencyChart';
 import JitterChart from './JitterChart';
 import PacketLossCard from './PacketLossCard';
 import AudioLab from './AudioLab';
+import ReplayPanel from './ReplayPanel';
 
 // When the backend serves this page (production), use the same address.
 // When running "npm run dev" (port 3000), talk to the backend on port 8000.
@@ -147,7 +148,9 @@ const Dashboard = () => {
   // Start Simulation handler
   const handleStart = async () => {
     try {
-      await fetch(`${API_BASE}/simulation/start`, { method: 'POST' });
+      // In replay mode "Start" plays the loaded recording again from the beginning
+      const path = metrics.source === 'replay' ? '/replay/restart' : '/simulation/start';
+      await fetch(`${API_BASE}${path}`, { method: 'POST' });
     } catch (err) {
       console.error('Failed to start simulation:', err);
     }
@@ -172,7 +175,17 @@ const Dashboard = () => {
     }
   };
 
+  // Called by the replay panel after it switches between the simulator and a recorded call
+  const handleModeChanged = () => {
+    setHistory([]);
+    fetch(`${API_BASE}/config`)
+      .then(res => res.json())
+      .then(data => { if (data) setConfig(data); })
+      .catch(err => console.log('Config fetch note:', err.message));
+  };
+
   const isRunning = metrics.status === 'RUNNING';
+  const isReplay = metrics.source === 'replay';
 
   // Display helpers
   // fmt: show a number with one decimal (and 0.0 for missing values)
@@ -203,12 +216,20 @@ const Dashboard = () => {
             <PhoneCall size={26} color="var(--accent-blue)" />
             Real-Time VoIP Call Quality Analyzer
           </h1>
-          <p>Simulate network problems and watch estimated call quality respond in real time</p>
+          <p>
+            {isReplay
+              ? 'Replaying packets recorded from a real call, with optional extra network problems on top'
+              : 'Simulate network problems and watch estimated call quality respond in real time'}
+          </p>
         </div>
         <div className={`status-badge ${!isRunning || !connected ? 'stopped' : ''}`}>
           <div className="status-dot"></div>
           <span>
-            {!connected ? 'Backend offline' : isRunning ? 'Simulation running' : 'Simulation stopped'}
+            {!connected
+              ? 'Backend offline'
+              : isReplay
+              ? (isRunning ? 'Replaying real call' : 'Replay stopped')
+              : isRunning ? 'Simulation running' : 'Simulation stopped'}
           </span>
         </div>
       </header>
@@ -222,6 +243,7 @@ const Dashboard = () => {
           onStart={handleStart}
           onStop={handleStop}
           onReset={handleReset}
+          replayMode={isReplay}
         />
         <MosGauge
           mos={metrics.mos}
@@ -229,6 +251,9 @@ const Dashboard = () => {
           rFactor={metrics.r_factor}
         />
       </div>
+
+      {/* Real call replay: run recorded packets through the same metric code */}
+      <ReplayPanel apiBase={API_BASE} metrics={metrics} onModeChanged={handleModeChanged} />
 
       {/* Key metrics */}
       <div className="metric-cards-grid">
@@ -296,8 +321,9 @@ const Dashboard = () => {
       <AudioLab config={config} apiBase={API_BASE} />
 
       <footer className="app-footer">
-        Synthetic RTP-style traffic over local UDP. Jitter follows RFC 3550 and quality
-        scores use a simplified ITU-T G.107 E-model.
+        {isReplay
+          ? 'Packets recorded from a real call, analysed with RFC 3550 jitter and a simplified ITU-T G.107 E-model.'
+          : 'Synthetic RTP-style traffic over local UDP. Jitter follows RFC 3550 and quality scores use a simplified ITU-T G.107 E-model.'}
       </footer>
     </div>
   );

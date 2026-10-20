@@ -7,3 +7,10 @@ node_modules/
 frontend/dist/
 venv/
 .venv/
+
+# Recorded calls can hold private network traffic and be large, so they stay on this computer.
+# The made-up example file is the only capture that is tracked.
+captures/*.pcap
+captures/*.pcapng
+captures/*.cap
+!captures/SYNTHETIC_*
